@@ -12,5 +12,6 @@ let ast = parser.parse();
 let code_gen = new CodeGen(ast);
 let js = code_gen.eval();
 
+// console.log(tokens);
 // console.log(ast);
 console.log(js);

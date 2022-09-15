@@ -4,14 +4,13 @@ import {
   NumExpr,
   FunctionCall,
   CommandExpr,
+  JsOpExpr,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
 
 class CodeGenError extends Error {}
 
-// [ NamedLet { name: 'a', expr: NumExpr { value: 10 } } ]
-// [ FunctionCall { name: 'print', args: [ [IdLookup] ] } ]
 class CodeGen {
   prelude = `
 function print(...args) {
@@ -52,9 +51,15 @@ function add(a, b) {
       return this.eval_function_call(expr);
     } else if (expr instanceof CommandExpr) {
       return this.eval_command_expr(expr);
+    } else if (expr instanceof JsOpExpr) {
+      return this.eval_js_op_expr(expr);
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_js_op_expr({ lhs, type, rhs }) {
+    return `${this.eval_expr(lhs)} ${type} ${this.eval_expr(rhs)}`;
   }
 
   eval_command_expr({ name, expr }) {

@@ -7,6 +7,7 @@ import {
   CloseParen,
   Comma,
   Command,
+  JsOp,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -43,7 +44,14 @@ export class CommandExpr {
   }
 }
 
-// [ Let {}, Id { value: 'a' }, Eq {}, Num { value: 10 } ]
+export class JsOpExpr {
+  constructor(lhs, type, rhs) {
+    this.lhs = lhs;
+    this.type = type;
+    this.rhs = rhs;
+  }
+}
+
 class Parser {
   index = 0;
   constructor(tokens) {
@@ -80,6 +88,7 @@ class Parser {
         ast.push(expr);
       }
     }
+
     return ast;
   }
 
@@ -100,7 +109,7 @@ class Parser {
     }
   }
 
-  parse_expr() {
+  first_parse_expr() {
     if (this.scan(Num)) {
       return this.parse_num();
     } else if (this.scan(Id, OpenParen)) {
@@ -110,6 +119,22 @@ class Parser {
     } else if (this.scan(Command)) {
       return this.parse_command();
     }
+  }
+
+  parse_expr() {
+    let expr = this.first_parse_expr();
+    if (!expr) return;
+    if (this.scan(JsOp)) {
+      return this.parse_js_op(expr);
+    } else {
+      return expr;
+    }
+  }
+
+  parse_js_op(lhs_expr) {
+    let { value: type } = this.consume(JsOp);
+    let rhs_expr = this.parse_expr();
+    return new JsOpExpr(lhs_expr, type, rhs_expr);
   }
 
   parse_command() {
