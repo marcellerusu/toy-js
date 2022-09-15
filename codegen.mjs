@@ -5,6 +5,8 @@ import {
   FunctionCall,
   CommandExpr,
 } from "./parser.mjs";
+import vm from "vm";
+let eval_context = vm.createContext();
 
 class CodeGenError extends Error {}
 
@@ -58,8 +60,7 @@ function add(a, b) {
   eval_command_expr({ name, expr }) {
     if (name !== "comptime!") throw new CodeGenError();
     let result = this.eval_expr(expr);
-    // TODO: don't use eval
-    return eval(this.js + result);
+    return vm.runInContext(this.js + result, eval_context);
   }
 
   eval_id_lookup({ name }) {
