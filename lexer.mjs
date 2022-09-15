@@ -14,6 +14,9 @@ export class CloseParen {}
 export class Comma {}
 export class Command extends Value {}
 export class JsOp extends Value {}
+export class Def {}
+export class End {}
+export class Return {}
 
 class Lexer {
   index = 0;
@@ -42,6 +45,12 @@ class Lexer {
         continue;
       } else if (this.scan(/let/)) {
         tokens.push(new Let());
+      } else if (this.scan(/def/)) {
+        tokens.push(new Def());
+      } else if (this.scan(/end/)) {
+        tokens.push(new End());
+      } else if (this.scan(/return/)) {
+        tokens.push(new Return());
       } else if (this.scan(/=/)) {
         tokens.push(new Eq());
       } else if (this.scan(/\(/)) {

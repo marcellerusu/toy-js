@@ -8,6 +8,9 @@ import {
   Comma,
   Command,
   JsOp,
+  Def,
+  Return,
+  End,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -52,6 +55,20 @@ export class JsOpExpr {
   }
 }
 
+export class FunctionDef {
+  constructor(name, args, body) {
+    this.name = name;
+    this.args = args;
+    this.body = body;
+  }
+}
+
+export class ReturnExpr {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
 class Parser {
   index = 0;
   constructor(tokens) {
@@ -75,10 +92,23 @@ class Parser {
     }
   }
 
-  parse() {
+  clone_and_parse_until(EndTokenClass) {
+    let cloned = new Parser(this.tokens);
+    cloned.index = this.index;
+    let result = cloned.parse(EndTokenClass);
+    this.index = cloned.index;
+    return result;
+  }
+
+  parse(EndTokenClass) {
     let ast = [];
 
-    while (this.index < this.tokens.length) {
+    let has_reached_end_token = () => {
+      if (!EndTokenClass) return false;
+      return this.cur_token instanceof EndTokenClass;
+    };
+
+    while (this.index < this.tokens.length && !has_reached_end_token()) {
       let statement = this.parse_statement();
       if (statement) {
         ast.push(statement);
@@ -106,6 +136,10 @@ class Parser {
   parse_statement() {
     if (this.scan(Let)) {
       return this.parse_let();
+    } else if (this.scan(Def)) {
+      return this.parse_def();
+    } else if (this.scan(Return)) {
+      return this.parse_return();
     }
   }
 
@@ -131,6 +165,29 @@ class Parser {
     }
   }
 
+  parse_return() {
+    this.consume(Return);
+    let expr = this.parse_expr();
+    return new ReturnExpr(expr);
+  }
+
+  parse_def() {
+    this.consume(Def);
+    let { value: name } = this.consume(Id);
+    this.consume(OpenParen);
+    let args = [];
+    while (!(this.cur_token instanceof CloseParen)) {
+      let { value: arg_name } = this.consume(Id);
+      args.push(arg_name);
+      if (!this.scan(Comma)) break;
+      this.consume(Comma);
+    }
+    this.consume(CloseParen);
+    let body = this.clone_and_parse_until(End);
+    this.consume(End);
+    return new FunctionDef(name, args, body);
+  }
+
   parse_js_op(lhs_expr) {
     let { value: type } = this.consume(JsOp);
     let rhs_expr = this.parse_expr();
@@ -154,7 +211,7 @@ class Parser {
     let { value: name } = this.consume(Id);
     this.consume(OpenParen);
     let args = [];
-    while (true) {
+    while (!(this.cur_token instanceof CloseParen)) {
       let arg = this.parse_expr();
       args.push(arg);
       if (!this.scan(Comma)) break;

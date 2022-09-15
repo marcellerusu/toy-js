@@ -5,6 +5,8 @@ import {
   FunctionCall,
   CommandExpr,
   JsOpExpr,
+  FunctionDef,
+  ReturnExpr,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
@@ -16,23 +18,43 @@ class CodeGen {
 function print(...args) {
   console.log(...args);
 }
-function add(a, b) {
-  return a + b;
-}
 `.trimStart();
 
   js = "";
-  constructor(ast) {
+  constructor(
+    ast,
+    { first_run, indentation } = { first_run: true, indentation: 0 }
+  ) {
     this.ast = ast;
+    this.first_run = first_run;
+    this.indentation = indentation;
+  }
+
+  padding() {
+    let str = "";
+    for (let i = 0; i < this.indentation; i++) {
+      str += " ";
+    }
+    return str;
   }
 
   eval() {
-    this.js = this.prelude;
+    if (this.first_run) {
+      this.js = this.prelude;
+    } else {
+      this.js = "";
+    }
+
     for (let statement of this.ast) {
+      this.js += this.padding();
       if (statement instanceof NamedLet) {
         this.js += this.eval_let(statement);
       } else if (statement instanceof FunctionCall) {
         this.js += this.eval_function_call(statement);
+      } else if (statement instanceof FunctionDef) {
+        this.js += this.eval_function_def(statement);
+      } else if (statement instanceof ReturnExpr) {
+        this.js += this.eval_return_expr(statement);
       } else {
         console.log(statement);
         throw new CodeGenError();
@@ -82,6 +104,20 @@ function add(a, b) {
 
   eval_let({ name, expr }) {
     return `let ${name} = ${this.eval_expr(expr)}`;
+  }
+
+  eval_return_expr({ expr }) {
+    return `return ${this.eval_expr(expr)}`;
+  }
+
+  eval_function_def({ name, args, body }) {
+    let f = `function ${name}(${args.join(", ")}) {\n`;
+    f += new CodeGen(body, {
+      indentation: this.indentation + 2,
+      first_run: false,
+    }).eval();
+    f += "}";
+    return f;
   }
 }
 
