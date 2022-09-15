@@ -1,4 +1,13 @@
-import { Let, Id, Eq, Num, OpenParen, CloseParen, Comma } from "./lexer.mjs";
+import {
+  Let,
+  Id,
+  Eq,
+  Num,
+  OpenParen,
+  CloseParen,
+  Comma,
+  Command,
+} from "./lexer.mjs";
 
 class ParseError extends Error {}
 
@@ -25,6 +34,12 @@ export class FunctionCall {
 export class IdLookup {
   constructor(name) {
     this.name = name;
+  }
+}
+export class CommandExpr {
+  constructor(name, expr) {
+    this.name = name;
+    this.expr = expr;
   }
 }
 
@@ -92,7 +107,16 @@ class Parser {
       return this.parse_function_call();
     } else if (this.scan(Id)) {
       return this.parse_id_lookup();
+    } else if (this.scan(Command)) {
+      return this.parse_command();
     }
+  }
+
+  parse_command() {
+    let { value: name } = this.consume(Command);
+    let expr = this.parse_expr();
+    if (!expr) throw new ParseError();
+    return new CommandExpr(name, expr);
   }
 
   parse_id_lookup() {

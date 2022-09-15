@@ -12,6 +12,7 @@ export class Eq {}
 export class OpenParen {}
 export class CloseParen {}
 export class Comma {}
+export class Command extends Value {}
 
 // [new Let(), new Id("a"), new Eq(), new Num(10)]
 class Lexer {
@@ -49,6 +50,8 @@ class Lexer {
         tokens.push(new CloseParen());
       } else if (this.scan(/,/)) {
         tokens.push(new Comma());
+      } else if (this.scan(/[a-zA-Z]+\!/)) {
+        tokens.push(new Command(this.matched));
       } else if (this.scan(/[a-zA-Z]+/)) {
         tokens.push(new Id(this.matched));
       } else if (this.scan(/[0-9]+/)) {

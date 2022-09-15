@@ -1,4 +1,10 @@
-import { IdLookup, NamedLet, NumExpr, FunctionCall } from "./parser.mjs";
+import {
+  IdLookup,
+  NamedLet,
+  NumExpr,
+  FunctionCall,
+  CommandExpr,
+} from "./parser.mjs";
 
 class CodeGenError extends Error {}
 
@@ -9,26 +15,30 @@ class CodeGen {
 function print(...args) {
   console.log(...args);
 }
+function add(a, b) {
+  return a + b;
+}
 `.trimStart();
 
+  js = "";
   constructor(ast) {
     this.ast = ast;
   }
 
   eval() {
-    let js = this.prelude;
+    this.js = this.prelude;
     for (let statement of this.ast) {
       if (statement instanceof NamedLet) {
-        js += this.eval_let(statement);
+        this.js += this.eval_let(statement);
       } else if (statement instanceof FunctionCall) {
-        js += this.eval_function_call(statement);
+        this.js += this.eval_function_call(statement);
       } else {
         console.log(statement);
         throw new CodeGenError();
       }
-      js += ";\n";
+      this.js += ";\n";
     }
-    return js;
+    return this.js;
   }
 
   eval_expr(expr) {
@@ -36,9 +46,20 @@ function print(...args) {
       return this.eval_num(expr);
     } else if (expr instanceof IdLookup) {
       return this.eval_id_lookup(expr);
+    } else if (expr instanceof FunctionCall) {
+      return this.eval_function_call(expr);
+    } else if (expr instanceof CommandExpr) {
+      return this.eval_command_expr(expr);
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_command_expr({ name, expr }) {
+    if (name !== "comptime!") throw new CodeGenError();
+    let result = this.eval_expr(expr);
+    // TODO: don't use eval
+    return eval(this.js + result);
   }
 
   eval_id_lookup({ name }) {
