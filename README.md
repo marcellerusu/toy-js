@@ -8,7 +8,7 @@ See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=P
 this snippet shows off all the usable features so far
 
 ```
-let ten = 10
+let ten = comptime! 5 + 5
 def add(a, b)
   return a + b
 end
