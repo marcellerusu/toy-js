@@ -2,4 +2,6 @@ def add(a, b)
   return a + b
 end
 
-print(add(10, 20) * 10)
+let three_hundred = comptime! add(10, 20) * 10
+
+print(three_hundred)

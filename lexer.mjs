@@ -1,3 +1,4 @@
+class LexerError extends Error {}
 export class Value {
   constructor(value) {
     this.value = value;
@@ -59,14 +60,16 @@ class Lexer {
         tokens.push(new CloseParen());
       } else if (this.scan(/,/)) {
         tokens.push(new Comma());
-      } else if (this.scan(/[a-zA-Z]+\!/)) {
+      } else if (this.scan(/[a-zA-Z_]+\!/)) {
         tokens.push(new Command(this.matched));
-      } else if (this.scan(/[a-zA-Z]+/)) {
+      } else if (this.scan(/[a-zA-Z_]+/)) {
         tokens.push(new Id(this.matched));
       } else if (this.scan(/[\+\-\*\/\%]/)) {
         tokens.push(new JsOp(this.matched));
       } else if (this.scan(/[0-9]+/)) {
         tokens.push(new Num(Number(this.matched)));
+      } else {
+        throw new LexerError("No token found");
       }
     }
     return tokens;
