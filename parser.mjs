@@ -12,6 +12,7 @@ import {
   Return,
   End,
   DataClass,
+  New,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -65,6 +66,11 @@ export class FunctionDef {
 }
 
 export class ReturnExpr {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+export class NewExpr {
   constructor(expr) {
     this.expr = expr;
   }
@@ -162,6 +168,8 @@ class Parser {
       return this.parse_id_lookup();
     } else if (this.scan(Command)) {
       return this.parse_command();
+    } else if (this.scan(New)) {
+      return this.parse_new_expr();
     }
   }
 
@@ -173,6 +181,12 @@ class Parser {
     } else {
       return expr;
     }
+  }
+
+  parse_new_expr() {
+    this.consume(New);
+    let expr = this.parse_expr();
+    return new NewExpr(expr);
   }
 
   parse_arg_names() {

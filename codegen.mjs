@@ -8,6 +8,7 @@ import {
   FunctionDef,
   ReturnExpr,
   DataClassDef,
+  NewExpr,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
@@ -77,9 +78,15 @@ function print(...args) {
       return this.eval_command_expr(expr);
     } else if (expr instanceof JsOpExpr) {
       return this.eval_js_op_expr(expr);
+    } else if (expr instanceof NewExpr) {
+      return this.eval_new_expr(expr);
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_new_expr({ expr }) {
+    return `new ${this.eval_expr(expr)}`;
   }
 
   eval_data_class_def({ name, properties }) {

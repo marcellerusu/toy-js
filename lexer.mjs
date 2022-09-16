@@ -19,6 +19,7 @@ export class Def {}
 export class End {}
 export class Return {}
 export class DataClass {}
+export class New {}
 
 class Lexer {
   index = 0;
@@ -55,6 +56,8 @@ class Lexer {
         tokens.push(new Return());
       } else if (this.scan(/dataclass/)) {
         tokens.push(new DataClass());
+      } else if (this.scan(/new/)) {
+        tokens.push(new New());
       } else if (this.scan(/=/)) {
         tokens.push(new Eq());
       } else if (this.scan(/\(/)) {

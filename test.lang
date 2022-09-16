@@ -1,3 +1,5 @@
 dataclass JsOpExpr(lhs, type, rhs)
 
-print(JsOpExpr)
+let expr = new JsOpExpr(1, 2, 3)
+
+print(expr)
