@@ -11,6 +11,7 @@ import {
   Def,
   Return,
   End,
+  DataClass,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -69,6 +70,13 @@ export class ReturnExpr {
   }
 }
 
+export class DataClassDef {
+  constructor(name, properties) {
+    this.name = name;
+    this.properties = properties;
+  }
+}
+
 class Parser {
   index = 0;
   constructor(tokens) {
@@ -100,7 +108,7 @@ class Parser {
     return result;
   }
 
-  parse(EndTokenClass) {
+  parse(EndTokenClass = null) {
     let ast = [];
 
     let has_reached_end_token = () => {
@@ -114,7 +122,7 @@ class Parser {
         ast.push(statement);
       } else {
         let expr = this.parse_expr();
-        if (!expr) throw ParseError();
+        if (!expr) throw new ParseError();
         ast.push(expr);
       }
     }
@@ -138,6 +146,8 @@ class Parser {
       return this.parse_let();
     } else if (this.scan(Def)) {
       return this.parse_def();
+    } else if (this.scan(DataClass)) {
+      return this.parse_data_class_def();
     } else if (this.scan(Return)) {
       return this.parse_return();
     }
@@ -165,15 +175,7 @@ class Parser {
     }
   }
 
-  parse_return() {
-    this.consume(Return);
-    let expr = this.parse_expr();
-    return new ReturnExpr(expr);
-  }
-
-  parse_def() {
-    this.consume(Def);
-    let { value: name } = this.consume(Id);
+  parse_arg_names() {
     this.consume(OpenParen);
     let args = [];
     while (!(this.cur_token instanceof CloseParen)) {
@@ -183,6 +185,26 @@ class Parser {
       this.consume(Comma);
     }
     this.consume(CloseParen);
+    return args;
+  }
+
+  parse_data_class_def() {
+    this.consume(DataClass);
+    let { value: name } = this.consume(Id);
+    let properties = this.parse_arg_names();
+    return new DataClassDef(name, properties);
+  }
+
+  parse_return() {
+    this.consume(Return);
+    let expr = this.parse_expr();
+    return new ReturnExpr(expr);
+  }
+
+  parse_def() {
+    this.consume(Def);
+    let { value: name } = this.consume(Id);
+    let args = this.parse_arg_names();
     let body = this.clone_and_parse_until(End);
     this.consume(End);
     return new FunctionDef(name, args, body);
@@ -206,7 +228,6 @@ class Parser {
     return new IdLookup(name);
   }
 
-  // [Id, OpenParen, ...(arg, comma), CloseParen]
   parse_function_call() {
     let { value: name } = this.consume(Id);
     this.consume(OpenParen);

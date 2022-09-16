@@ -18,6 +18,7 @@ export class JsOp extends Value {}
 export class Def {}
 export class End {}
 export class Return {}
+export class DataClass {}
 
 class Lexer {
   index = 0;
@@ -52,6 +53,8 @@ class Lexer {
         tokens.push(new End());
       } else if (this.scan(/return/)) {
         tokens.push(new Return());
+      } else if (this.scan(/dataclass/)) {
+        tokens.push(new DataClass());
       } else if (this.scan(/=/)) {
         tokens.push(new Eq());
       } else if (this.scan(/\(/)) {

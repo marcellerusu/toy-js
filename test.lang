@@ -1,7 +1,3 @@
-def add(a, b)
-  return a + b
-end
+dataclass JsOpExpr(lhs, type, rhs)
 
-let three_hundred = comptime! add(10, 20) * 10
-
-print(three_hundred)
+print(JsOpExpr)

@@ -7,6 +7,7 @@ import {
   JsOpExpr,
   FunctionDef,
   ReturnExpr,
+  DataClassDef,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
@@ -30,7 +31,7 @@ function print(...args) {
     this.indentation = indentation;
   }
 
-  padding() {
+  get padding() {
     let str = "";
     for (let i = 0; i < this.indentation; i++) {
       str += " ";
@@ -46,7 +47,7 @@ function print(...args) {
     }
 
     for (let statement of this.ast) {
-      this.js += this.padding();
+      this.js += this.padding;
       if (statement instanceof NamedLet) {
         this.js += this.eval_let(statement);
       } else if (statement instanceof FunctionCall) {
@@ -55,9 +56,10 @@ function print(...args) {
         this.js += this.eval_function_def(statement);
       } else if (statement instanceof ReturnExpr) {
         this.js += this.eval_return_expr(statement);
+      } else if (statement instanceof DataClassDef) {
+        this.js += this.eval_data_class_def(statement);
       } else {
-        console.log(statement);
-        throw new CodeGenError();
+        this.js += this.eval_expr(statement);
       }
       this.js += ";\n";
     }
@@ -78,6 +80,17 @@ function print(...args) {
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_data_class_def({ name, properties }) {
+    return `
+class ${name} {
+${this.padding}  constructor(${properties.join(", ")}) {
+${properties
+  .map((property) => `${this.padding}    this.${property} = ${property};`)
+  .join("\n")}
+${this.padding}  }
+}`.trimStart();
   }
 
   eval_js_op_expr({ lhs, type, rhs }) {
