@@ -1,0 +1,73 @@
+export dataclass Id(name)
+export dataclass Num(value)
+export dataclass Let
+export dataclass Eq
+export dataclass OpenParen
+export dataclass CloseParen
+export dataclass Comma
+export dataclass Command(name)
+export dataclass JsOp(op_type)
+export dataclass Def
+export dataclass End
+export dataclass Return
+export dataclass DataClass
+export dataclass New
+export dataclass Dot
+
+class Lexer(str)
+  index = 0
+  get rest_of_string = .str.slice(this.index)
+
+  matched = null
+  def scan(regex)
+    let result = .rest_of_string.match(regex);
+    return false if !result || result.index !== 0
+    .index += result[0].length;
+    .matched = result[0];
+    return true;
+  end
+
+  def tokenize
+    let tokens = [];
+    while .index < .str.length do
+      if .scan(/\s+/)
+        continue;
+      else if .scan(/let/)
+        tokens.push(new Let());
+      else if .scan(/def/)
+        tokens.push(new Def());
+      else if .scan(/end/)
+        tokens.push(new End());
+      else if .scan(/return/)
+        tokens.push(new Return());
+      else if .scan(/dataclass/)
+        tokens.push(new DataClass());
+      else if .scan(/new/)
+        tokens.push(new New());
+      else if .scan(/\./)
+        tokens.push(new Dot());
+      else if .scan(/=/)
+        tokens.push(new Eq());
+      else if .scan(/\(/)
+        tokens.push(new OpenParen());
+      else if .scan(/\)/)
+        tokens.push(new CloseParen());
+      else if .scan(/,/)
+        tokens.push(new Comma());
+      else if .scan(/[a-zA-Z_]+\!/)
+        tokens.push(new Command(.matched));
+      else if .scan(/[a-zA-Z_]+/)
+        tokens.push(new Id(.matched));
+      else if .scan(/[\+\-\*\/\%]/)
+        tokens.push(new JsOp(.matched));
+      else if .scan(/[0-9]+/)
+        tokens.push(new Num(Number(.matched)));
+      else
+        assert_not_reached! "No Token Found"
+      end
+    end
+    return tokens;
+  end
+end
+
+export default Lexer;
