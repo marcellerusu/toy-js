@@ -221,7 +221,8 @@ class Parser {
   parse_data_class_def() {
     this.consume(DataClass);
     let { value: name } = this.consume(Id);
-    let properties = this.parse_arg_names();
+    let properties = null;
+    if (this.scan(OpenParen)) properties = this.parse_arg_names();
     return new DataClassDef(name, properties);
   }
 

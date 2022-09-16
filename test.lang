@@ -1,5 +1,1 @@
-dataclass JsOpExpr(lhs, type, rhs)
-
-let expr = new JsOpExpr(1, 2, 3)
-
-print(expr.lhs)
+dataclass Name

@@ -96,7 +96,12 @@ function print(...args) {
     return `new ${this.eval_expr(expr)}`;
   }
 
+  eval_empty_data_class_def(name) {
+    return `class ${name} {}`;
+  }
   eval_data_class_def({ name, properties }) {
+    if (!properties) return this.eval_empty_data_class_def(name);
+
     return `
 class ${name} {
 ${this.padding}  constructor(${properties.join(", ")}) {
