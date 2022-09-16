@@ -13,6 +13,7 @@ import {
   End,
   DataClass,
   New,
+  Dot,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -80,6 +81,13 @@ export class DataClassDef {
   constructor(name, properties) {
     this.name = name;
     this.properties = properties;
+  }
+}
+
+export class DotAccess {
+  constructor(lhs, property) {
+    this.lhs = lhs;
+    this.property = property;
   }
 }
 
@@ -178,9 +186,17 @@ class Parser {
     if (!expr) return;
     if (this.scan(JsOp)) {
       return this.parse_js_op(expr);
+    } else if (this.scan(Dot)) {
+      return this.parse_dot_access(expr);
     } else {
       return expr;
     }
+  }
+
+  parse_dot_access(lhs) {
+    this.consume(Dot);
+    let { value: property } = this.consume(Id);
+    return new DotAccess(lhs, property);
   }
 
   parse_new_expr() {

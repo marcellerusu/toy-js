@@ -20,6 +20,7 @@ export class End {}
 export class Return {}
 export class DataClass {}
 export class New {}
+export class Dot {}
 
 class Lexer {
   index = 0;
@@ -58,6 +59,8 @@ class Lexer {
         tokens.push(new DataClass());
       } else if (this.scan(/new/)) {
         tokens.push(new New());
+      } else if (this.scan(/\./)) {
+        tokens.push(new Dot());
       } else if (this.scan(/=/)) {
         tokens.push(new Eq());
       } else if (this.scan(/\(/)) {

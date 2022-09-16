@@ -9,6 +9,7 @@ import {
   ReturnExpr,
   DataClassDef,
   NewExpr,
+  DotAccess,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
@@ -80,9 +81,15 @@ function print(...args) {
       return this.eval_js_op_expr(expr);
     } else if (expr instanceof NewExpr) {
       return this.eval_new_expr(expr);
+    } else if (expr instanceof DotAccess) {
+      return this.eval_dot_access(expr);
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_dot_access({ lhs, property }) {
+    return `${this.eval_expr(lhs)}.${property}`;
   }
 
   eval_new_expr({ expr }) {
