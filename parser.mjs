@@ -17,6 +17,9 @@ import {
   Class,
   Get,
   Str,
+  Bang,
+  OpenSquare,
+  CloseSquare,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -80,12 +83,18 @@ export class ReturnExpr {
     this.expr = expr;
   }
 }
+
 export class NewExpr {
   constructor(expr) {
     this.expr = expr;
   }
 }
 
+export class NotExpr {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
 export class DataClassDef {
   constructor(name, properties) {
     this.name = name;
@@ -125,6 +134,12 @@ export class ClassGetterExpr {
 export class PrefixDotLookup {
   constructor(name) {
     this.name = name;
+  }
+}
+
+export class ArrayLiteral {
+  constructor(elements) {
+    this.elements = elements;
   }
 }
 
@@ -217,10 +232,11 @@ class Parser {
       return this.parse_command();
     } else if (this.scan(New)) {
       return this.parse_new_expr();
-    } else if (
-      this.scan(Dot, Id) &&
-      this.prev_token.line === this.cur_token.line
-    ) {
+    } else if (this.scan(Bang)) {
+      return this.parse_not_expr();
+    } else if (this.scan(OpenSquare)) {
+      return this.parse_array();
+    } else if (this.scan(Dot, Id)) {
       return this.parse_prefix_dot_lookup();
     }
   }
@@ -232,7 +248,10 @@ class Parser {
     while (true) {
       if (this.scan(JsOp)) {
         expr = this.parse_js_op(expr);
-      } else if (this.scan(Dot)) {
+      } else if (
+        this.scan(Dot) &&
+        this.prev_token.line === this.cur_token.line
+      ) {
         expr = this.parse_dot_access(expr);
       } else if (this.scan(OpenParen)) {
         expr = this.parse_function_call(expr);
@@ -242,6 +261,23 @@ class Parser {
     }
 
     return expr;
+  }
+
+  parse_array() {
+    let elements = [];
+    this.consume(OpenSquare);
+    while (!this.scan(CloseSquare)) {
+      elements.push(this.parse_expr());
+      if (!this.scan(CloseSquare)) this.consume(Comma);
+    }
+    this.consume(CloseSquare);
+    return new ArrayLiteral(elements);
+  }
+
+  parse_not_expr() {
+    this.consume(Bang);
+    let expr = this.parse_expr();
+    return new NotExpr(expr);
   }
 
   parse_prefix_dot_lookup() {
@@ -270,6 +306,8 @@ class Parser {
       return this.parse_class_instance_entry();
     } else if (this.scan(Get)) {
       return this.parse_getter();
+    } else if (this.scan(Def)) {
+      return this.parse_def();
     } else {
       throw new ParseError("no class entry found");
     }
@@ -332,7 +370,8 @@ class Parser {
   parse_def() {
     this.consume(Def);
     let { value: name } = this.consume(Id);
-    let args = this.parse_arg_names();
+    let args = [];
+    if (this.scan(OpenParen)) args = this.parse_arg_names();
     let body = this.clone_and_parse_until(End);
     this.consume(End);
     return new FunctionDef(name, args, body);

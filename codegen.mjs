@@ -15,6 +15,8 @@ import {
   ClassGetterExpr,
   PrefixDotLookup,
   StrExpr,
+  NotExpr,
+  ArrayLiteral,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
@@ -90,13 +92,21 @@ function print(...args) {
       return this.eval_js_op_expr(expr);
     } else if (expr instanceof NewExpr) {
       return this.eval_new_expr(expr);
+    } else if (expr instanceof NotExpr) {
+      return this.eval_not_expr(expr);
     } else if (expr instanceof DotAccess) {
       return this.eval_dot_access(expr);
     } else if (expr instanceof PrefixDotLookup) {
       return this.eval_prefix_dot_lookup(expr);
+    } else if (expr instanceof ArrayLiteral) {
+      return this.eval_array_literal(expr);
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_array_literal({ elements }) {
+    return `[${elements.map(this.eval_expr.bind(this)).join(", ")}]`;
   }
 
   eval_prefix_dot_lookup({ name }) {
@@ -124,11 +134,23 @@ function print(...args) {
     return g;
   }
 
+  eval_method({ name, args, body }) {
+    let f = `  ${name}(${args.join(", ")}) {\n`;
+    f += new CodeGen(body, {
+      indentation: this.indentation + 4,
+      first_run: false,
+    }).eval();
+    f += "  }";
+    return f;
+  }
+
   eval_class_entry(entry) {
     if (entry instanceof ClassInstanceEntry) {
       return this.eval_class_instance_entry(entry);
     } else if (entry instanceof ClassGetterExpr) {
       return this.eval_class_getter_expr(entry);
+    } else if (entry instanceof FunctionDef) {
+      return this.eval_method(entry);
     } else {
       throw new CodeGenError(
         `not supported class entry - ${entry} | ${typeof entry}`
@@ -154,6 +176,10 @@ function print(...args) {
 
   eval_new_expr({ expr }) {
     return `new ${this.eval_expr(expr)}`;
+  }
+
+  eval_not_expr({ expr }) {
+    return `!${this.eval_expr(expr)}`;
   }
 
   eval_empty_data_class_def(name) {

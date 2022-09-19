@@ -30,7 +30,10 @@ export class New extends Token {}
 export class Dot extends Token {}
 export class Class extends Token {}
 export class Get extends Token {}
+export class Bang extends Token {}
 export class Str extends Value {}
+export class OpenSquare extends Token {}
+export class CloseSquare extends Token {}
 
 class Lexer {
   index = 0;
@@ -86,6 +89,12 @@ class Lexer {
         tokens.push(new OpenParen(line));
       } else if (this.scan(/\)/)) {
         tokens.push(new CloseParen(line));
+      } else if (this.scan(/\[/)) {
+        tokens.push(new OpenSquare(line));
+      } else if (this.scan(/\]/)) {
+        tokens.push(new CloseSquare(line));
+      } else if (this.scan(/\!/)) {
+        tokens.push(new Bang(line));
       } else if (this.scan(/,/)) {
         tokens.push(new Comma(line));
       } else if (this.scan(/[a-zA-Z_]+\!/)) {
