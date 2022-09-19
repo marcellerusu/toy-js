@@ -1,1 +1,9 @@
-dataclass Name
+class Lexer(str)
+  index = 5
+  matched = null
+  get rest_of_string = .str.slice(.index)
+end
+
+let l = new Lexer("let a = 10")
+
+print(l.rest_of_string)

@@ -14,6 +14,9 @@ import {
   DataClass,
   New,
   Dot,
+  Class,
+  Get,
+  Str,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -31,9 +34,15 @@ export class NumExpr {
   }
 }
 
+export class StrExpr {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
 export class FunctionCall {
-  constructor(name, args) {
-    this.name = name;
+  constructor(lhs_expr, args) {
+    this.lhs_expr = lhs_expr;
     this.args = args;
   }
 }
@@ -88,6 +97,34 @@ export class DotAccess {
   constructor(lhs, property) {
     this.lhs = lhs;
     this.property = property;
+  }
+}
+
+export class ClassDef {
+  constructor(name, properties, entries) {
+    this.name = name;
+    this.properties = properties;
+    this.entries = entries;
+  }
+}
+
+export class ClassInstanceEntry {
+  constructor(name, expr) {
+    this.name = name;
+    this.expr = expr;
+  }
+}
+
+export class ClassGetterExpr {
+  constructor(name, expr) {
+    this.name = name;
+    this.expr = expr;
+  }
+}
+
+export class PrefixDotLookup {
+  constructor(name) {
+    this.name = name;
   }
 }
 
@@ -164,33 +201,93 @@ class Parser {
       return this.parse_data_class_def();
     } else if (this.scan(Return)) {
       return this.parse_return();
+    } else if (this.scan(Class)) {
+      return this.parse_class();
     }
   }
 
   first_parse_expr() {
     if (this.scan(Num)) {
       return this.parse_num();
-    } else if (this.scan(Id, OpenParen)) {
-      return this.parse_function_call();
+    } else if (this.scan(Str)) {
+      return this.parse_str();
     } else if (this.scan(Id)) {
       return this.parse_id_lookup();
     } else if (this.scan(Command)) {
       return this.parse_command();
     } else if (this.scan(New)) {
       return this.parse_new_expr();
+    } else if (
+      this.scan(Dot, Id) &&
+      this.prev_token.line === this.cur_token.line
+    ) {
+      return this.parse_prefix_dot_lookup();
     }
   }
 
   parse_expr() {
     let expr = this.first_parse_expr();
     if (!expr) return;
-    if (this.scan(JsOp)) {
-      return this.parse_js_op(expr);
-    } else if (this.scan(Dot)) {
-      return this.parse_dot_access(expr);
-    } else {
-      return expr;
+
+    while (true) {
+      if (this.scan(JsOp)) {
+        expr = this.parse_js_op(expr);
+      } else if (this.scan(Dot)) {
+        expr = this.parse_dot_access(expr);
+      } else if (this.scan(OpenParen)) {
+        expr = this.parse_function_call(expr);
+      } else {
+        break;
+      }
     }
+
+    return expr;
+  }
+
+  parse_prefix_dot_lookup() {
+    this.consume(Dot);
+    let { value: name } = this.consume(Id);
+    return new PrefixDotLookup(name);
+  }
+
+  parse_class_instance_entry() {
+    let { value: name } = this.consume(Id);
+    this.consume(Eq);
+    let expr = this.parse_expr();
+    return new ClassInstanceEntry(name, expr);
+  }
+
+  parse_getter() {
+    this.consume(Get);
+    let { value: name } = this.consume(Id);
+    this.consume(Eq);
+    let expr = this.parse_expr();
+    return new ClassGetterExpr(name, expr);
+  }
+
+  parse_class_entry() {
+    if (this.scan(Id, Eq)) {
+      return this.parse_class_instance_entry();
+    } else if (this.scan(Get)) {
+      return this.parse_getter();
+    } else {
+      throw new ParseError("no class entry found");
+    }
+  }
+
+  parse_class() {
+    this.consume(Class);
+    let { value: name } = this.consume(Id);
+    let properties = null;
+    if (this.scan(OpenParen)) {
+      properties = this.parse_arg_names();
+    }
+    let entries = [];
+    while (!this.scan(End)) {
+      entries.push(this.parse_class_entry());
+    }
+    this.consume(End);
+    return new ClassDef(name, properties, entries);
   }
 
   parse_dot_access(lhs) {
@@ -259,8 +356,7 @@ class Parser {
     return new IdLookup(name);
   }
 
-  parse_function_call() {
-    let { value: name } = this.consume(Id);
+  parse_function_call(expr) {
     this.consume(OpenParen);
     let args = [];
     while (!(this.cur_token instanceof CloseParen)) {
@@ -270,7 +366,12 @@ class Parser {
       this.consume(Comma);
     }
     this.consume(CloseParen);
-    return new FunctionCall(name, args);
+    return new FunctionCall(expr, args);
+  }
+
+  parse_str() {
+    let { value } = this.consume(Str);
+    return new StrExpr(value);
   }
 
   parse_num() {
