@@ -20,6 +20,14 @@ import {
   Bang,
   OpenSquare,
   CloseSquare,
+  If,
+  Else,
+  PlusEq,
+  While,
+  Do,
+  Regex,
+  Continue,
+  Break,
 } from "./lexer.mjs";
 
 class ParseError extends Error {}
@@ -32,6 +40,12 @@ export class NamedLet {
 }
 
 export class NumExpr {
+  constructor(value) {
+    this.value = value;
+  }
+}
+
+export class RegexNode {
   constructor(value) {
     this.value = value;
   }
@@ -83,6 +97,10 @@ export class ReturnExpr {
     this.expr = expr;
   }
 }
+
+export class ContinueStatement {}
+
+export class BreakStatement {}
 
 export class NewExpr {
   constructor(expr) {
@@ -143,6 +161,60 @@ export class ArrayLiteral {
   }
 }
 
+export class IfStatement {
+  constructor(branches) {
+    this.branches = branches;
+  }
+}
+
+export class IfBranch {
+  constructor(test_expr, body) {
+    this.test_expr = test_expr;
+    this.body = body;
+  }
+}
+
+export class ElseIfBranch {
+  constructor(test_expr, body) {
+    this.test_expr = test_expr;
+    this.body = body;
+  }
+}
+
+export class ElseBranch {
+  constructor(body) {
+    this.body = body;
+  }
+}
+
+export class NodeAssignment {
+  constructor(lhs_expr, rhs_expr) {
+    this.lhs_expr = lhs_expr;
+    this.rhs_expr = rhs_expr;
+  }
+}
+
+export class NodePlusAssignment {
+  constructor(lhs_expr, rhs_expr) {
+    this.lhs_expr = lhs_expr;
+    this.rhs_expr = rhs_expr;
+  }
+}
+
+export class WhileStatement {
+  constructor(test_expr, body) {
+    this.test_expr = test_expr;
+    this.body = body;
+  }
+}
+
+export class PropertyLookup {
+  constructor(lhs, property) {
+    this.lhs = lhs;
+    this.property = property;
+  }
+}
+
 class Parser {
   index = 0;
   constructor(tokens) {
@@ -166,31 +238,37 @@ class Parser {
     }
   }
 
-  clone_and_parse_until(EndTokenClass) {
+  clone_and_parse_until(...end_tokens) {
     let cloned = new Parser(this.tokens);
     cloned.index = this.index;
-    let result = cloned.parse(EndTokenClass);
+    let result = cloned.parse(...end_tokens);
     this.index = cloned.index;
     return result;
   }
 
-  parse(EndTokenClass = null) {
+  parse(...end_tokens) {
     let ast = [];
 
     let has_reached_end_token = () => {
-      if (!EndTokenClass) return false;
-      return this.cur_token instanceof EndTokenClass;
+      if (end_tokens.length === 0) return false;
+      return end_tokens.some(
+        (EndTokenClass) => this.cur_token instanceof EndTokenClass
+      );
     };
 
     while (this.index < this.tokens.length && !has_reached_end_token()) {
-      let statement = this.parse_statement();
-      if (statement) {
-        ast.push(statement);
-      } else {
-        let expr = this.parse_expr();
-        if (!expr) throw new ParseError();
-        ast.push(expr);
+      let statement_or_expr = this.parse_statement();
+
+      if (!statement_or_expr) {
+        statement_or_expr = this.parse_expr();
+        if (!statement_or_expr) throw new ParseError();
       }
+
+      if (this.scan(If)) {
+        statement_or_expr = this.parse_postfix_if(statement_or_expr);
+      }
+
+      ast.push(statement_or_expr);
     }
 
     return ast;
@@ -216,14 +294,24 @@ class Parser {
       return this.parse_data_class_def();
     } else if (this.scan(Return)) {
       return this.parse_return();
+    } else if (this.scan(Continue)) {
+      return this.parse_continue();
+    } else if (this.scan(Break)) {
+      return this.parse_break();
     } else if (this.scan(Class)) {
       return this.parse_class();
+    } else if (this.scan(If)) {
+      return this.parse_if();
+    } else if (this.scan(While)) {
+      return this.parse_while();
     }
   }
 
   first_parse_expr() {
     if (this.scan(Num)) {
       return this.parse_num();
+    } else if (this.scan(Regex)) {
+      return this.parse_regex();
     } else if (this.scan(Str)) {
       return this.parse_str();
     } else if (this.scan(Id)) {
@@ -241,9 +329,30 @@ class Parser {
     }
   }
 
+  ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup];
+  parse_node_assignment(lhs_expr) {
+    this.consume(Eq);
+    let rhs_expr = this.parse_expr();
+    return new NodeAssignment(lhs_expr, rhs_expr);
+  }
+
+  parse_node_plus_assignment(lhs_expr) {
+    this.consume(PlusEq);
+    let rhs_expr = this.parse_expr();
+    return new NodePlusAssignment(lhs_expr, rhs_expr);
+  }
+
   parse_expr() {
     let expr = this.first_parse_expr();
     if (!expr) return;
+
+    if (this.ASSIGNABLE_NODES.includes(expr.constructor)) {
+      if (this.scan(Eq)) {
+        return this.parse_node_assignment(expr);
+      } else if (this.scan(PlusEq)) {
+        return this.parse_node_plus_assignment(expr);
+      }
+    }
 
     while (true) {
       if (this.scan(JsOp)) {
@@ -253,6 +362,11 @@ class Parser {
         this.prev_token.line === this.cur_token.line
       ) {
         expr = this.parse_dot_access(expr);
+      } else if (
+        this.scan(OpenSquare) &&
+        this.prev_token.line === this.cur_token.line
+      ) {
+        expr = this.parse_property_lookup(expr);
       } else if (this.scan(OpenParen)) {
         expr = this.parse_function_call(expr);
       } else {
@@ -261,6 +375,64 @@ class Parser {
     }
 
     return expr;
+  }
+  parse_property_lookup(lhs) {
+    this.consume(OpenSquare);
+    let property = this.parse_expr();
+    this.consume(CloseSquare);
+    return new PropertyLookup(lhs, property);
+  }
+
+  parse_while() {
+    this.consume(While);
+    let test_expr = this.parse_expr();
+    this.consume(Do);
+    let body = this.clone_and_parse_until(End);
+    this.consume(End);
+    return new WhileStatement(test_expr, body);
+  }
+
+  parse_postfix_if(lhs) {
+    this.consume(If);
+    let test_expr = this.parse_expr();
+    return new IfStatement([new IfBranch(test_expr, [lhs])]);
+  }
+
+  parse_else_if() {
+    this.consume(Else);
+    this.consume(If);
+    let test_expr = this.parse_expr();
+    let body = this.clone_and_parse_until(Else, End);
+    return new ElseIfBranch(test_expr, body);
+  }
+
+  parse_else() {
+    this.consume(Else);
+    let body = this.clone_and_parse_until(End);
+    return new ElseBranch(body);
+  }
+
+  parse_pass_branch() {
+    this.consume(If);
+    let test_expr = this.parse_expr();
+    let pass_body = this.clone_and_parse_until(Else, End);
+    return new IfBranch(test_expr, pass_body);
+  }
+
+  parse_if() {
+    let branches = [];
+    branches.push(this.parse_pass_branch());
+
+    while (!this.scan(End)) {
+      if (this.scan(Else, If)) {
+        branches.push(this.parse_else_if());
+      } else if (this.scan(Else)) {
+        branches.push(this.parse_else());
+      }
+    }
+
+    this.consume(End);
+    return new IfStatement(branches);
   }
 
   parse_array() {
@@ -321,7 +493,7 @@ class Parser {
       properties = this.parse_arg_names();
     }
     let entries = [];
-    while (!this.scan(End)) {
+    while (!this.scan(End) && this.cur_token) {
       entries.push(this.parse_class_entry());
     }
     this.consume(End);
@@ -367,6 +539,15 @@ class Parser {
     return new ReturnExpr(expr);
   }
 
+  parse_continue() {
+    this.consume(Continue);
+    return new ContinueStatement();
+  }
+
+  parse_break() {
+    this.consume(Break);
+    return new BreakStatement();
+  }
   parse_def() {
     this.consume(Def);
     let { value: name } = this.consume(Id);
@@ -411,6 +592,11 @@ class Parser {
   parse_str() {
     let { value } = this.consume(Str);
     return new StrExpr(value);
+  }
+
+  parse_regex() {
+    let { value } = this.consume(Regex);
+    return new RegexNode(value);
   }
 
   parse_num() {

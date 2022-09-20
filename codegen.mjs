@@ -17,18 +17,26 @@ import {
   StrExpr,
   NotExpr,
   ArrayLiteral,
+  IfStatement,
+  NodeAssignment,
+  NodePlusAssignment,
+  WhileStatement,
+  RegexNode,
+  ContinueStatement,
+  BreakStatement,
+  IfBranch,
+  ElseIfBranch,
+  ElseBranch,
+  PropertyLookup,
 } from "./parser.mjs";
 import vm from "vm";
+
 let eval_context = vm.createContext();
 
 class CodeGenError extends Error {}
 
 class CodeGen {
-  prelude = `
-function print(...args) {
-  console.log(...args);
-}
-`.trimStart();
+  prelude = ``;
 
   js = "";
   constructor(
@@ -69,6 +77,18 @@ function print(...args) {
         this.js += this.eval_data_class_def(statement);
       } else if (statement instanceof ClassDef) {
         this.js += this.eval_class_def(statement);
+      } else if (statement instanceof IfStatement) {
+        this.js += this.eval_if_statement(statement);
+      } else if (statement instanceof NodeAssignment) {
+        this.js += this.eval_node_assignment(statement);
+      } else if (statement instanceof NodePlusAssignment) {
+        this.js += this.eval_node_plus_assignment(statement);
+      } else if (statement instanceof WhileStatement) {
+        this.js += this.eval_while_statement(statement);
+      } else if (statement instanceof ContinueStatement) {
+        this.js += this.eval_continue();
+      } else if (statement instanceof BreakStatement) {
+        this.js += this.eval_break();
       } else {
         this.js += this.eval_expr(statement);
       }
@@ -80,6 +100,8 @@ function print(...args) {
   eval_expr(expr) {
     if (expr instanceof NumExpr) {
       return this.eval_num(expr);
+    } else if (expr instanceof RegexNode) {
+      return this.eval_regex_node(expr);
     } else if (expr instanceof StrExpr) {
       return this.eval_str(expr);
     } else if (expr instanceof IdLookup) {
@@ -100,9 +122,73 @@ function print(...args) {
       return this.eval_prefix_dot_lookup(expr);
     } else if (expr instanceof ArrayLiteral) {
       return this.eval_array_literal(expr);
+    } else if (expr instanceof PropertyLookup) {
+      return this.eval_property_lookup(expr);
     } else {
       throw new CodeGenError();
     }
+  }
+
+  eval_property_lookup({ lhs, property }) {
+    return `${this.eval_expr(lhs)}[${this.eval_expr(property)}]`;
+  }
+
+  eval_continue() {
+    return "continue";
+  }
+
+  eval_break() {
+    return "break";
+  }
+
+  eval_while_statement({ test_expr, body }) {
+    let w = `while (${this.eval_expr(test_expr)}) {\n`;
+    w += this.eval_body(body);
+    w += `${this.padding}}`;
+    return w;
+  }
+
+  eval_node_plus_assignment({ lhs_expr, rhs_expr }) {
+    let lhs = this.eval_expr(lhs_expr),
+      rhs = this.eval_expr(rhs_expr);
+    return `${lhs} += ${rhs}`;
+  }
+
+  eval_node_assignment({ lhs_expr, rhs_expr }) {
+    let lhs = this.eval_expr(lhs_expr),
+      rhs = this.eval_expr(rhs_expr);
+    return `${lhs} = ${rhs}`;
+  }
+
+  eval_body(body, indent_by = 2) {
+    return (
+      new CodeGen(body, {
+        indentation: this.indentation + indent_by,
+        first_run: false,
+      })
+        .eval()
+        .trimEnd() + "\n"
+    );
+  }
+
+  eval_if_statement({ branches }) {
+    let _if = "";
+    for (let branch of branches) {
+      if (branch instanceof IfBranch) {
+        _if += `if (${this.eval_expr(branch.test_expr)}) {\n`;
+        _if += this.eval_body(branch.body);
+        _if += `${this.padding}}`;
+      } else if (branch instanceof ElseIfBranch) {
+        _if += ` else if (${this.eval_expr(branch.test_expr)}) {\n`;
+        _if += this.eval_body(branch.body);
+        _if += `${this.padding}}`;
+      } else if (branch instanceof ElseBranch) {
+        _if += ` else {\n`;
+        _if += this.eval_body(branch.body);
+        _if += `${this.padding}}`;
+      }
+    }
+    return _if;
   }
 
   eval_array_literal({ elements }) {
@@ -136,11 +222,8 @@ function print(...args) {
 
   eval_method({ name, args, body }) {
     let f = `  ${name}(${args.join(", ")}) {\n`;
-    f += new CodeGen(body, {
-      indentation: this.indentation + 4,
-      first_run: false,
-    }).eval();
-    f += "  }";
+    f += this.eval_body(body, 4);
+    f += `${this.padding}  }`;
     return f;
   }
 
@@ -217,6 +300,10 @@ function print(...args) {
     return value;
   }
 
+  eval_regex_node({ value }) {
+    return value;
+  }
+
   eval_str({ value }) {
     return `"${value}"`;
   }
@@ -231,10 +318,7 @@ function print(...args) {
 
   eval_function_def({ name, args, body }) {
     let f = `function ${name}(${args.join(", ")}) {\n`;
-    f += new CodeGen(body, {
-      indentation: this.indentation + 2,
-      first_run: false,
-    }).eval();
+    f += this.eval_body(body);
     f += "}";
     return f;
   }

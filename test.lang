@@ -1,1 +1,78 @@
-let arr = [10, "cool"]
+dataclass Id(name)
+dataclass Num(value)
+dataclass Let
+dataclass Eq
+dataclass OpenParen
+dataclass CloseParen
+dataclass Comma
+dataclass Command(name)
+dataclass JsOp(op_type)
+dataclass Def
+dataclass End
+dataclass Return
+dataclass DataClass
+dataclass New
+dataclass Dot
+
+class Lexer(str)
+  index = 0
+  get rest_of_string = .str.slice(.index)
+
+  matched = null
+  def scan(regex)
+    let result = .rest_of_string.match(regex)
+    return false if !result || result.index !== 0
+    .index += result[0].length
+    .matched = result[0]
+    return true
+  end
+
+  def tokenize
+    let tokens = []
+    while .index < .str.length do
+      if .scan(/\s+/)
+        continue
+      else if .scan(/let/)
+        tokens.push(new Let())
+      else if .scan(/def/)
+        tokens.push(new Def())
+      else if .scan(/end/)
+        tokens.push(new End())
+      else if .scan(/return/)
+        tokens.push(new Return())
+      else if .scan(/dataclass/)
+        tokens.push(new DataClass())
+      else if .scan(/class/)
+        tokens.push(new DataClass())
+      else if .scan(/new/)
+        tokens.push(new New())
+      else if .scan(/\./)
+        tokens.push(new Dot())
+      else if .scan(/=/)
+        tokens.push(new Eq())
+      else if .scan(/\(/)
+        tokens.push(new OpenParen())
+      else if .scan(/\)/)
+        tokens.push(new CloseParen())
+      else if .scan(/,/)
+        tokens.push(new Comma())
+      else if .scan(/[a-zA-Z_]+\!/)
+        tokens.push(new Command(.matched))
+      else if .scan(/[a-zA-Z_]+/)
+        tokens.push(new Id(.matched))
+      else if .scan(/[\+\-\*\/\%]/)
+        tokens.push(new JsOp(.matched))
+      else if .scan(/[0-9]+/)
+        tokens.push(new Num(Number(.matched)))
+      else
+        console.error("lol")
+      end
+    end
+    return tokens
+  end
+end
+
+let l = new Lexer("let a = 10")
+
+console.log(l.tokenize())
+
