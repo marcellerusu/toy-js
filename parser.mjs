@@ -28,7 +28,9 @@ import {
   Regex,
   Continue,
   Break,
-} from "./lexer.mjs";
+  Export,
+  Default,
+} from "./dist/lexer.mjs";
 
 class ParseError extends Error {}
 
@@ -215,6 +217,18 @@ export class PropertyLookup {
   }
 }
 
+export class ExportDefault {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+export class ExportStatement {
+  constructor(statement) {
+    this.statement = statement;
+  }
+}
+
 class Parser {
   index = 0;
   constructor(tokens) {
@@ -313,6 +327,10 @@ class Parser {
       return this.parse_if();
     } else if (this.scan(While)) {
       return this.parse_while();
+    } else if (this.scan(Export, Default)) {
+      return this.parse_export_default();
+    } else if (this.scan(Export)) {
+      return this.parse_export();
     }
   }
 
@@ -385,6 +403,20 @@ class Parser {
 
     return expr;
   }
+
+  parse_export_default() {
+    this.consume(Export);
+    this.consume(Default);
+    let expr = this.parse_expr();
+    return new ExportDefault(expr);
+  }
+
+  parse_export() {
+    this.consume(Export);
+    let statement = this.parse_statement();
+    return new ExportStatement(statement);
+  }
+
   parse_property_lookup(lhs) {
     this.consume(OpenSquare);
     let property = this.parse_expr();
@@ -463,12 +495,12 @@ class Parser {
 
   parse_prefix_dot_lookup() {
     this.consume(Dot);
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     return new PrefixDotLookup(name);
   }
 
   parse_class_instance_entry() {
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     this.consume(Eq);
     let expr = this.parse_expr();
     return new ClassInstanceEntry(name, expr);
@@ -476,7 +508,7 @@ class Parser {
 
   parse_getter() {
     this.consume(Get);
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     this.consume(Eq);
     let expr = this.parse_expr();
     return new ClassGetterExpr(name, expr);
@@ -496,7 +528,7 @@ class Parser {
 
   parse_class() {
     this.consume(Class);
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     let properties = null;
     if (this.scan(OpenParen)) {
       properties = this.parse_arg_names();
@@ -511,7 +543,7 @@ class Parser {
 
   parse_dot_access(lhs) {
     this.consume(Dot);
-    let { value: property } = this.consume(Id);
+    let { name: property } = this.consume(Id);
     return new DotAccess(lhs, property);
   }
 
@@ -525,7 +557,7 @@ class Parser {
     this.consume(OpenParen);
     let args = [];
     while (!(this.cur_token instanceof CloseParen)) {
-      let { value: arg_name } = this.consume(Id);
+      let { name: arg_name } = this.consume(Id);
       args.push(arg_name);
       if (!this.scan(Comma)) break;
       this.consume(Comma);
@@ -536,7 +568,7 @@ class Parser {
 
   parse_data_class_def() {
     this.consume(DataClass);
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     let properties = null;
     if (this.scan(OpenParen)) properties = this.parse_arg_names();
     return new DataClassDef(name, properties);
@@ -559,7 +591,7 @@ class Parser {
   }
   parse_def() {
     this.consume(Def);
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     let args = [];
     if (this.scan(OpenParen)) args = this.parse_arg_names();
     let body = this.clone_and_parse_until(End);
@@ -568,20 +600,20 @@ class Parser {
   }
 
   parse_js_op(lhs_expr) {
-    let { value: type } = this.consume(JsOp);
+    let { op } = this.consume(JsOp);
     let rhs_expr = this.parse_expr();
-    return new JsOpExpr(lhs_expr, type, rhs_expr);
+    return new JsOpExpr(lhs_expr, op, rhs_expr);
   }
 
   parse_command() {
-    let { value: name } = this.consume(Command);
+    let { name } = this.consume(Command);
     let expr = this.parse_expr();
     if (!expr) throw new ParseError();
     return new CommandExpr(name, expr);
   }
 
   parse_id_lookup() {
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     return new IdLookup(name);
   }
 
@@ -615,7 +647,7 @@ class Parser {
 
   parse_let() {
     this.consume(Let);
-    let { value: name } = this.consume(Id);
+    let { name } = this.consume(Id);
     this.consume(Eq);
     let expr = this.parse_expr();
     return new NamedLet(name, expr);

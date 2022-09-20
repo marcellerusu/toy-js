@@ -28,6 +28,8 @@ import {
   ElseIfBranch,
   ElseBranch,
   PropertyLookup,
+  ExportDefault,
+  ExportStatement,
 } from "./parser.mjs";
 import vm from "vm";
 
@@ -65,36 +67,46 @@ class CodeGen {
 
     for (let statement of this.ast) {
       this.js += this.padding;
-      if (statement instanceof NamedLet) {
-        this.js += this.eval_let(statement);
-      } else if (statement instanceof FunctionCall) {
-        this.js += this.eval_function_call(statement);
-      } else if (statement instanceof FunctionDef) {
-        this.js += this.eval_function_def(statement);
-      } else if (statement instanceof ReturnExpr) {
-        this.js += this.eval_return_expr(statement);
-      } else if (statement instanceof DataClassDef) {
-        this.js += this.eval_data_class_def(statement);
-      } else if (statement instanceof ClassDef) {
-        this.js += this.eval_class_def(statement);
-      } else if (statement instanceof IfStatement) {
-        this.js += this.eval_if_statement(statement);
-      } else if (statement instanceof NodeAssignment) {
-        this.js += this.eval_node_assignment(statement);
-      } else if (statement instanceof NodePlusAssignment) {
-        this.js += this.eval_node_plus_assignment(statement);
-      } else if (statement instanceof WhileStatement) {
-        this.js += this.eval_while_statement(statement);
-      } else if (statement instanceof ContinueStatement) {
-        this.js += this.eval_continue();
-      } else if (statement instanceof BreakStatement) {
-        this.js += this.eval_break();
-      } else {
-        this.js += this.eval_expr(statement);
-      }
+      let statement_js = this.eval_statement(statement);
+      if (!statement) this.js += this.eval_expr(statement);
+      else this.js += statement_js;
+
       this.js += ";\n";
     }
     return this.js;
+  }
+
+  eval_statement(statement) {
+    if (statement instanceof NamedLet) {
+      return this.eval_let(statement);
+    } else if (statement instanceof FunctionCall) {
+      return this.eval_function_call(statement);
+    } else if (statement instanceof FunctionDef) {
+      return this.eval_function_def(statement);
+    } else if (statement instanceof ReturnExpr) {
+      return this.eval_return_expr(statement);
+    } else if (statement instanceof DataClassDef) {
+      return this.eval_data_class_def(statement);
+    } else if (statement instanceof ClassDef) {
+      return this.eval_class_def(statement);
+    } else if (statement instanceof IfStatement) {
+      return this.eval_if_statement(statement);
+    } else if (statement instanceof NodeAssignment) {
+      return this.eval_node_assignment(statement);
+    } else if (statement instanceof NodePlusAssignment) {
+      return this.eval_node_plus_assignment(statement);
+    } else if (statement instanceof WhileStatement) {
+      return this.eval_while_statement(statement);
+    } else if (statement instanceof ContinueStatement) {
+      return this.eval_continue();
+    } else if (statement instanceof BreakStatement) {
+      return this.eval_break();
+    } else if (statement instanceof ExportDefault) {
+      return this.eval_export_default(statement);
+    } else if (statement instanceof ExportStatement) {
+      return this.eval_export_statement(statement);
+    } else {
+    }
   }
 
   eval_expr(expr) {
@@ -128,6 +140,14 @@ class CodeGen {
       console.log(expr);
       throw new CodeGenError();
     }
+  }
+
+  eval_export_default({ expr }) {
+    return `export default ${this.eval_expr(expr)}`;
+  }
+
+  eval_export_statement({ statement }) {
+    return `export ${this.eval_statement(statement)}`;
   }
 
   eval_property_lookup({ lhs, property }) {

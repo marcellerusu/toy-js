@@ -1,78 +1,209 @@
-class LexerError extends Error {}
-
-class Token {
+export class Id {
+  constructor(line, name) {
+    this.line = line;
+    this.name = name;
+  }
+}
+export class Num {
+  constructor(line, value, is_negative) {
+    this.line = line;
+    this.value = value;
+    this.is_negative = is_negative;
+  }
+}
+export class Command {
+  constructor(line, name) {
+    this.line = line;
+    this.name = name;
+  }
+}
+export class Str {
+  constructor(line, value) {
+    this.line = line;
+    this.value = value;
+  }
+}
+export class Regex {
+  constructor(line, value) {
+    this.line = line;
+    this.value = value;
+  }
+}
+export class JsOp {
+  constructor(line, op) {
+    this.line = line;
+    this.op = op;
+  }
+}
+export class Let {
   constructor(line) {
     this.line = line;
   }
 }
-
-class Value extends Token {
-  constructor(line, value) {
-    super(line);
-    this.value = value;
+export class Eq {
+  constructor(line) {
+    this.line = line;
   }
 }
-
-export class Id extends Value {}
-export class Num extends Value {
-  constructor(line, value, is_negative = false) {
-    super(line, value);
-    this.is_negative = is_negative;
+export class PlusEq {
+  constructor(line) {
+    this.line = line;
   }
 }
-export class Let extends Token {}
-export class Eq extends Token {}
-export class PlusEq extends Token {}
-export class OpenParen extends Token {}
-export class CloseParen extends Token {}
-export class Comma extends Token {}
-export class Command extends Value {}
-export class JsOp extends Value {}
-export class Def extends Token {}
-export class End extends Token {}
-export class Return extends Token {}
-export class DataClass extends Token {}
-export class New extends Token {}
-export class Dot extends Token {}
-export class Class extends Token {}
-export class Get extends Token {}
-export class Bang extends Token {}
-export class Str extends Value {}
-export class OpenSquare extends Token {}
-export class CloseSquare extends Token {}
-export class If extends Token {}
-export class Else extends Token {}
-export class While extends Token {}
-export class Break extends Token {}
-export class Continue extends Token {}
-export class Do extends Token {}
-export class Regex extends Value {}
-
+export class OpenParen {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class CloseParen {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Comma {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Def {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class End {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Return {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class DataClass {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class New {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Dot {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Class {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Get {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Bang {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class OpenSquare {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class CloseSquare {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class If {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Else {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Or {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class And {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class TripleEq {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class NotTripleEq {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class While {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Break {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Continue {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Do {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Export {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Default {
+  constructor(line) {
+    this.line = line;
+  }
+}
 class Lexer {
-  index = 0;
   constructor(str) {
     this.str = str;
   }
-
-  matched = null;
+  index = 0;
   get rest_of_string() {
     return this.str.slice(this.index);
   }
-
+  matched = null;
   scan(regex) {
     let result = this.rest_of_string.match(regex);
-    if (!result || result.index !== 0) return false;
+    if (!result || result.index !== 0) {
+      return false;
+    }
     this.index += result[0].length;
     this.matched = result[0];
     return true;
   }
-
   tokenize() {
     let tokens = [];
     let line = 0;
     while (this.index < this.str.length) {
       if (this.scan(/\n/)) {
-        line++;
+        line += 1;
         continue;
       } else if (this.scan(/\s+/)) {
         continue;
@@ -80,6 +211,10 @@ class Lexer {
         tokens.push(new Let(line));
       } else if (this.scan(/while/)) {
         tokens.push(new While(line));
+      } else if (this.scan(/export/)) {
+        tokens.push(new Export(line));
+      } else if (this.scan(/default/)) {
+        tokens.push(new Default(line));
       } else if (this.scan(/do/)) {
         tokens.push(new Do(line));
       } else if (this.scan(/\/.*\//)) {
@@ -128,7 +263,7 @@ class Lexer {
         tokens.push(new PlusEq(line));
       } else if (this.scan(/[0-9]+/)) {
         tokens.push(new Num(line, Number(this.matched)));
-      } else if (this.scan(/\-[0-9]+/)) {
+      } else if (this.scan(/-[0-9]+/)) {
         tokens.push(new Num(line, Number(this.matched), true));
       } else if (this.scan(/[\+\-\*\/\%\<\>]|>=|<=|&&|\|\||===|!==/)) {
         tokens.push(new JsOp(line, this.matched));
@@ -137,11 +272,10 @@ class Lexer {
       } else if (this.scan(/\!/)) {
         tokens.push(new Bang(line));
       } else {
-        throw new LexerError("No token found");
+        console.error("oh no");
       }
     }
     return tokens;
   }
 }
-
 export default Lexer;

@@ -1,1 +1,3 @@
-dataclass Name
+export dataclass Name
+
+export default Name

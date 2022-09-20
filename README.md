@@ -6,9 +6,9 @@ See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=P
 
 # Progress
 
-[x] can compile the lexer
-[] can compile the parser
-[] can compile the codegen
+- [x] can compile the lexer
+- [ ] can compile the parser
+- [ ] can compile the codegen
 
 # Syntax
 

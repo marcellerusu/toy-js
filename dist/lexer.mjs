@@ -1,170 +1,181 @@
-class Id {
+export class Id {
   constructor(line, name) {
     this.line = line;
     this.name = name;
   }
 }
-class Command {
+export class Num {
+  constructor(line, value, is_negative) {
+    this.line = line;
+    this.value = value;
+    this.is_negative = is_negative;
+  }
+}
+export class Command {
   constructor(line, name) {
     this.line = line;
     this.name = name;
   }
 }
-class Num {
+export class Str {
   constructor(line, value) {
     this.line = line;
     this.value = value;
   }
 }
-class Str {
+export class Regex {
   constructor(line, value) {
     this.line = line;
     this.value = value;
   }
 }
-class Regex {
-  constructor(line, value) {
-    this.line = line;
-    this.value = value;
-  }
-}
-class JsOp {
+export class JsOp {
   constructor(line, op) {
     this.line = line;
     this.op = op;
   }
 }
-class Let {
+export class Let {
   constructor(line) {
     this.line = line;
   }
 }
-class Eq {
+export class Eq {
   constructor(line) {
     this.line = line;
   }
 }
-class PlusEq {
+export class PlusEq {
   constructor(line) {
     this.line = line;
   }
 }
-class OpenParen {
+export class OpenParen {
   constructor(line) {
     this.line = line;
   }
 }
-class CloseParen {
+export class CloseParen {
   constructor(line) {
     this.line = line;
   }
 }
-class Comma {
+export class Comma {
   constructor(line) {
     this.line = line;
   }
 }
-class Def {
+export class Def {
   constructor(line) {
     this.line = line;
   }
 }
-class End {
+export class End {
   constructor(line) {
     this.line = line;
   }
 }
-class Return {
+export class Return {
   constructor(line) {
     this.line = line;
   }
 }
-class DataClass {
+export class DataClass {
   constructor(line) {
     this.line = line;
   }
 }
-class New {
+export class New {
   constructor(line) {
     this.line = line;
   }
 }
-class Dot {
+export class Dot {
   constructor(line) {
     this.line = line;
   }
 }
-class Class {
+export class Class {
   constructor(line) {
     this.line = line;
   }
 }
-class Get {
+export class Get {
   constructor(line) {
     this.line = line;
   }
 }
-class Bang {
+export class Bang {
   constructor(line) {
     this.line = line;
   }
 }
-class OpenSquare {
+export class OpenSquare {
   constructor(line) {
     this.line = line;
   }
 }
-class CloseSquare {
+export class CloseSquare {
   constructor(line) {
     this.line = line;
   }
 }
-class If {
+export class If {
   constructor(line) {
     this.line = line;
   }
 }
-class Else {
+export class Else {
   constructor(line) {
     this.line = line;
   }
 }
-class Or {
+export class Or {
   constructor(line) {
     this.line = line;
   }
 }
-class And {
+export class And {
   constructor(line) {
     this.line = line;
   }
 }
-class TripleEq {
+export class TripleEq {
   constructor(line) {
     this.line = line;
   }
 }
-class NotTripleEq {
+export class NotTripleEq {
   constructor(line) {
     this.line = line;
   }
 }
-class While {
+export class While {
   constructor(line) {
     this.line = line;
   }
 }
-class Break {
+export class Break {
   constructor(line) {
     this.line = line;
   }
 }
-class Continue {
+export class Continue {
   constructor(line) {
     this.line = line;
   }
 }
-class Do {
+export class Do {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Export {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Default {
   constructor(line) {
     this.line = line;
   }
@@ -200,6 +211,10 @@ class Lexer {
         tokens.push(new Let(line));
       } else if (this.scan(/while/)) {
         tokens.push(new While(line));
+      } else if (this.scan(/export/)) {
+        tokens.push(new Export(line));
+      } else if (this.scan(/default/)) {
+        tokens.push(new Default(line));
       } else if (this.scan(/do/)) {
         tokens.push(new Do(line));
       } else if (this.scan(/\/.*\//)) {
@@ -246,14 +261,16 @@ class Lexer {
         tokens.push(new Id(line, this.matched));
       } else if (this.scan(/\+=/)) {
         tokens.push(new PlusEq(line));
+      } else if (this.scan(/[0-9]+/)) {
+        tokens.push(new Num(line, Number(this.matched)));
+      } else if (this.scan(/-[0-9]+/)) {
+        tokens.push(new Num(line, Number(this.matched), true));
       } else if (this.scan(/[\+\-\*\/\%\<\>]|>=|<=|&&|\|\||===|!==/)) {
         tokens.push(new JsOp(line, this.matched));
       } else if (this.scan(/=/)) {
         tokens.push(new Eq(line));
       } else if (this.scan(/\!/)) {
         tokens.push(new Bang(line));
-      } else if (this.scan(/[0-9]+/)) {
-        tokens.push(new Num(line, Number(this.matched)));
       } else {
         console.error("oh no");
       }
@@ -261,5 +278,4 @@ class Lexer {
     return tokens;
   }
 }
-
 export default Lexer;
