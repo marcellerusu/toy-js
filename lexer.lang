@@ -1,18 +1,36 @@
-export dataclass Id(name)
-export dataclass Num(value)
-export dataclass Let
-export dataclass Eq
-export dataclass OpenParen
-export dataclass CloseParen
-export dataclass Comma
-export dataclass Command(name)
-export dataclass JsOp(op_type)
-export dataclass Def
-export dataclass End
-export dataclass Return
-export dataclass DataClass
-export dataclass New
-export dataclass Dot
+dataclass Id(line, name)
+dataclass Command(line, name)
+dataclass Num(line, value)
+dataclass Str(line, value)
+dataclass Regex(line, value)
+dataclass JsOp(line, op)
+dataclass Let(line)
+dataclass Eq(line)
+dataclass PlusEq(line)
+dataclass OpenParen(line)
+dataclass CloseParen(line)
+dataclass Comma(line)
+dataclass Def(line)
+dataclass End(line)
+dataclass Return(line)
+dataclass DataClass(line)
+dataclass New(line)
+dataclass Dot(line)
+dataclass Class(line)
+dataclass Get(line)
+dataclass Bang(line)
+dataclass OpenSquare(line)
+dataclass CloseSquare(line)
+dataclass If(line)
+dataclass Else(line)
+dataclass Or(line)
+dataclass And(line)
+dataclass TripleEq(line)
+dataclass NotTripleEq(line)
+dataclass While(line)
+dataclass Break(line)
+dataclass Continue(line)
+dataclass Do(line)
 
 class Lexer(str)
   index = 0
@@ -29,47 +47,77 @@ class Lexer(str)
 
   def tokenize
     let tokens = []
+    let line = 0
     while .index < .str.length do
-      if .scan(/\s+/)
+      if .scan(/\n/)
+        line += 1
+        continue
+      else if .scan(/\s+/)
         continue
       else if .scan(/let/)
-        tokens.push(new Let())
+        tokens.push(new Let(line))
+      else if .scan(/while/)
+        tokens.push(new While(line))
+      else if .scan(/do/)
+        tokens.push(new Do(line))
+      else if .scan(/\/.*\//)
+        tokens.push(new Regex(line, .matched))
+      else if .scan(/continue/)
+        tokens.push(new Continue(line))
+      else if .scan( /break/)
+        tokens.push(new Break(line))
       else if .scan(/def/)
-        tokens.push(new Def())
+        tokens.push(new Def(line))
+      else if .scan(/if/)
+        tokens.push(new If(line))
+      else if .scan(/else/)
+        tokens.push(new Else(line))
       else if .scan(/end/)
-        tokens.push(new End())
+        tokens.push(new End(line))
       else if .scan(/return/)
-        tokens.push(new Return())
+        tokens.push(new Return(line))
       else if .scan(/dataclass/)
-        tokens.push(new DataClass())
+        tokens.push(new DataClass(line))
+      else if .scan(/".*"/)
+        tokens.push(new Str(line, .matched.slice(1, -1)))
       else if .scan(/class/)
-        tokens.push(new DataClass())
+        tokens.push(new Class(line))
+      else if .scan(/get/)
+        tokens.push(new Get(line))
       else if .scan(/new/)
-        tokens.push(new New())
+        tokens.push(new New(line))
       else if .scan(/\./)
-        tokens.push(new Dot())
-      else if .scan(/=/)
-        tokens.push(new Eq())
+        tokens.push(new Dot(line))
       else if .scan(/\(/)
-        tokens.push(new OpenParen())
+        tokens.push(new OpenParen(line))
       else if .scan(/\)/)
-        tokens.push(new CloseParen())
+        tokens.push(new CloseParen(line))
+      else if .scan(/\[/)
+        tokens.push(new OpenSquare(line))
+      else if .scan(/\]/)
+        tokens.push(new CloseSquare(line))
       else if .scan(/,/)
-        tokens.push(new Comma())
+        tokens.push(new Comma(line))
       else if .scan(/[a-zA-Z_]+\!/)
-        tokens.push(new Command(.matched))
+        tokens.push(new Command(line, .matched))
       else if .scan(/[a-zA-Z_]+/)
-        tokens.push(new Id(.matched))
-      else if .scan(/[\+\-\*\/\%]/)
-        tokens.push(new JsOp(.matched))
+        tokens.push(new Id(line, .matched))
+      else if .scan(/\+=/)
+        tokens.push(new PlusEq(line))
+      else if .scan(/[\+\-\*\/\%\<\>]|>=|<=|&&|\|\||===|!==/)
+        tokens.push(new JsOp(line, .matched))
+      else if .scan(/=/)
+        tokens.push(new Eq(line))
+      else if .scan(/\!/)
+        tokens.push(new Bang(line))
       else if .scan(/[0-9]+/)
-        tokens.push(new Num(Number(.matched)))
+        tokens.push(new Num(line, Number(.matched)))
       else
-        assert_not_reached! "No Token Found"
+        console.error("oh no")
       end
     end
     return tokens
   end
 end
 
-export default Lexer
+

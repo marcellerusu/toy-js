@@ -1,78 +1,198 @@
-class LexerError extends Error {}
-
-class Token {
+class Id {
+  constructor(line, name) {
+    this.line = line;
+    this.name = name;
+  }
+}
+class Command {
+  constructor(line, name) {
+    this.line = line;
+    this.name = name;
+  }
+}
+class Num {
+  constructor(line, value) {
+    this.line = line;
+    this.value = value;
+  }
+}
+class Str {
+  constructor(line, value) {
+    this.line = line;
+    this.value = value;
+  }
+}
+class Regex {
+  constructor(line, value) {
+    this.line = line;
+    this.value = value;
+  }
+}
+class JsOp {
+  constructor(line, op) {
+    this.line = line;
+    this.op = op;
+  }
+}
+class Let {
   constructor(line) {
     this.line = line;
   }
 }
-
-class Value extends Token {
-  constructor(line, value) {
-    super(line);
-    this.value = value;
+class Eq {
+  constructor(line) {
+    this.line = line;
   }
 }
-
-export class Id extends Value {}
-export class Num extends Value {
-  constructor(line, value, is_negative = false) {
-    super(line, value);
-    this.is_negative = is_negative;
+class PlusEq {
+  constructor(line) {
+    this.line = line;
   }
 }
-export class Let extends Token {}
-export class Eq extends Token {}
-export class PlusEq extends Token {}
-export class OpenParen extends Token {}
-export class CloseParen extends Token {}
-export class Comma extends Token {}
-export class Command extends Value {}
-export class JsOp extends Value {}
-export class Def extends Token {}
-export class End extends Token {}
-export class Return extends Token {}
-export class DataClass extends Token {}
-export class New extends Token {}
-export class Dot extends Token {}
-export class Class extends Token {}
-export class Get extends Token {}
-export class Bang extends Token {}
-export class Str extends Value {}
-export class OpenSquare extends Token {}
-export class CloseSquare extends Token {}
-export class If extends Token {}
-export class Else extends Token {}
-export class While extends Token {}
-export class Break extends Token {}
-export class Continue extends Token {}
-export class Do extends Token {}
-export class Regex extends Value {}
-
+class OpenParen {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class CloseParen {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Comma {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Def {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class End {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Return {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class DataClass {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class New {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Dot {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Class {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Get {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Bang {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class OpenSquare {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class CloseSquare {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class If {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Else {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Or {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class And {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class TripleEq {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class NotTripleEq {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class While {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Break {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Continue {
+  constructor(line) {
+    this.line = line;
+  }
+}
+class Do {
+  constructor(line) {
+    this.line = line;
+  }
+}
 class Lexer {
-  index = 0;
   constructor(str) {
     this.str = str;
   }
-
-  matched = null;
+  index = 0;
   get rest_of_string() {
     return this.str.slice(this.index);
   }
-
+  matched = null;
   scan(regex) {
     let result = this.rest_of_string.match(regex);
-    if (!result || result.index !== 0) return false;
+    if (!result || result.index !== 0) {
+      return false;
+    }
     this.index += result[0].length;
     this.matched = result[0];
     return true;
   }
-
   tokenize() {
     let tokens = [];
     let line = 0;
     while (this.index < this.str.length) {
       if (this.scan(/\n/)) {
-        line++;
+        line += 1;
         continue;
       } else if (this.scan(/\s+/)) {
         continue;
@@ -126,18 +246,16 @@ class Lexer {
         tokens.push(new Id(line, this.matched));
       } else if (this.scan(/\+=/)) {
         tokens.push(new PlusEq(line));
-      } else if (this.scan(/[0-9]+/)) {
-        tokens.push(new Num(line, Number(this.matched)));
-      } else if (this.scan(/\-[0-9]+/)) {
-        tokens.push(new Num(line, Number(this.matched), true));
       } else if (this.scan(/[\+\-\*\/\%\<\>]|>=|<=|&&|\|\||===|!==/)) {
         tokens.push(new JsOp(line, this.matched));
       } else if (this.scan(/=/)) {
         tokens.push(new Eq(line));
       } else if (this.scan(/\!/)) {
         tokens.push(new Bang(line));
+      } else if (this.scan(/[0-9]+/)) {
+        tokens.push(new Num(line, Number(this.matched)));
       } else {
-        throw new LexerError("No token found");
+        console.error("oh no");
       }
     }
     return tokens;

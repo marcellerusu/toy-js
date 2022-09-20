@@ -125,6 +125,7 @@ class CodeGen {
     } else if (expr instanceof PropertyLookup) {
       return this.eval_property_lookup(expr);
     } else {
+      console.log(expr);
       throw new CodeGenError();
     }
   }
@@ -296,7 +297,8 @@ class CodeGen {
     return `${this.eval_expr(lhs_expr)}(${js_args})`;
   }
 
-  eval_num({ value }) {
+  eval_num({ value, is_negative }) {
+    if (is_negative) return `-${value}`;
     return value;
   }
 

@@ -234,6 +234,9 @@ class Parser {
       this.index += 1;
       return this.prev_token;
     } else {
+      console.error(
+        `[lexer.lang:${this.cur_token.line}] Expected ${TokenClass}, got ${this.cur_token.constructor}`
+      );
       throw new ParseError();
     }
   }
@@ -261,11 +264,17 @@ class Parser {
 
       if (!statement_or_expr) {
         statement_or_expr = this.parse_expr();
-        if (!statement_or_expr) throw new ParseError();
+
+        if (!statement_or_expr) {
+          console.log(this.cur_token);
+          throw new ParseError();
+        }
       }
 
-      if (this.scan(If)) {
+      if (this.scan(If) && this.prev_token.line === this.cur_token.line) {
         statement_or_expr = this.parse_postfix_if(statement_or_expr);
+      } else if (this.scan(If)) {
+        throw new ParseError("Unexpected If");
       }
 
       ast.push(statement_or_expr);
