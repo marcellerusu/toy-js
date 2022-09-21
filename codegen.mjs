@@ -43,6 +43,10 @@ import {
   RegularObjectProperty,
   RenamedProperty,
   ImportStatement,
+  DefaultImport,
+  LetArrDeconstruction,
+  ArrNameEntry,
+  ArrComma,
 } from "./dist/parser.mjs";
 import vm from "vm";
 
@@ -134,6 +138,10 @@ function panic(reason) {
       return this.eval_let_object_deconstruction(statement);
     } else if (statement instanceof ImportStatement) {
       return this.eval_import_statement(statement);
+    } else if (statement instanceof DefaultImport) {
+      return this.eval_default_import(statement);
+    } else if (statement instanceof LetArrDeconstruction) {
+      return this.eval_let_arr_deconstruction(statement);
     }
   }
 
@@ -179,6 +187,26 @@ function panic(reason) {
       throw new CodeGenError();
     }
   }
+
+  eval_let_arr_deconstruction({ entries, rhs }) {
+    let l = `let [`;
+    for (let entry of entries) {
+      if (entry instanceof ArrComma) {
+        l += `, `;
+      } else if (entry instanceof ArrNameEntry) {
+        l += `${entry.name}`;
+      } else {
+        throw new CodeGenError("not valid array deconstruction property");
+      }
+    }
+    l += `] = ${this.eval_expr(rhs)}`;
+    return l;
+  }
+
+  eval_default_import({ name, path }) {
+    return `import ${name} from "${path}"`;
+  }
+
   eval_import_statement({ imports, path }) {
     return `import { ${imports.join(", ")} } from "${path}"`;
   }

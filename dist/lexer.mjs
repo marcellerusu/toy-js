@@ -290,6 +290,8 @@ class Lexer {
         continue;
       } else if (this.scan(/\s+/)) {
         continue;
+      } else if (this.scan(/#.*/)) {
+        continue;
       } else if (this.scan(/let\b/)) {
         tokens.push(new Let(line));
       } else if (this.scan(/while\b/)) {

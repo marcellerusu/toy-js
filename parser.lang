@@ -50,7 +50,11 @@ export dataclass ParenExpr(expr)
 export dataclass RenamedProperty(old_name, new_name)
 export dataclass RegularObjectProperty(name)
 export dataclass LetObjectDeconstruction(entries, rhs)
+export dataclass LetArrDeconstruction(entries, rhs)
+export dataclass ArrComma
+export dataclass ArrNameEntry(name)
 export dataclass ImportStatement(imports, path)
+export dataclass DefaultImport(name, path)
 
 class Parser(tokens)
   index = 0
@@ -121,6 +125,8 @@ class Parser(tokens)
   def parse_statement
     if .scan(Let, OpenBrace)
       return .parse_let_obj()
+    else if .scan(Let, OpenSquare)
+      return .parse_let_arr()
     else if .scan(Let)
       return .parse_let()
     else if .scan(Def, Bind)
@@ -145,8 +151,10 @@ class Parser(tokens)
       return .parse_export_default()
     else if .scan(Export)
       return .parse_export()
+    else if .scan(Import, Id)
+      return .parse_default_import()
     else if .scan(Import)
-      return .parse_import()
+      return .parse_obj_import()
     else if .scan(For)
       return .parse_for_loop()
     end
@@ -244,7 +252,15 @@ class Parser(tokens)
     return expr
   end
 
-  def parse_import
+  def parse_default_import
+    .consume(Import)
+    let { name } = .consume(Id)
+    .consume(From)
+    let { value: path} = .consume(Str)
+    return new DefaultImport(name, path)
+  end
+
+  def parse_obj_import
     .consume(Import)
     .consume(OpenBrace)
     let imports = []
@@ -595,6 +611,25 @@ class Parser(tokens)
     else 
       assert_not_reached! "unknown object deconstruction entry"
     end
+  end
+
+  def parse_let_arr
+    .consume(Let)
+    .consume(OpenSquare)
+    let entries = []
+    while !.scan(CloseSquare) do
+      if .scan(Comma)
+        .consume(Comma)
+        entries.push(new ArrComma())
+      end
+      continue if .scan(Comma)
+      let { name } = .consume(Id)
+      entries.push(new ArrNameEntry(name))
+    end
+    .consume(CloseSquare)
+    .consume(Eq)
+    let rhs = .parse_expr()
+    return new LetArrDeconstruction(entries, rhs)
   end
 
   def parse_let_obj

@@ -84,6 +84,8 @@ class Lexer(str)
         continue
       else if .scan(/\s+/)
         continue
+      else if .scan(/#.*/)
+        continue
       else if .scan(/let\b/)
         tokens.push(new Let(line))
       else if .scan(/while\b/)
