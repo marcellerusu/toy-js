@@ -1,3 +1,7 @@
+class Panic extends Error {}
+function panic(reason) {
+  throw new Panic(reason);
+}
 export class Id {
   constructor(line, name) {
     this.line = line;
@@ -180,6 +184,56 @@ export class Default {
     this.line = line;
   }
 }
+export class Spread {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Arrow {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Bind {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Is {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Not {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class For {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Of {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class OpenBrace {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class CloseBrace {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class Colon {
+  constructor(line) {
+    this.line = line;
+  }
+}
 class Lexer {
   constructor(str) {
     this.str = str;
@@ -207,42 +261,52 @@ class Lexer {
         continue;
       } else if (this.scan(/\s+/)) {
         continue;
-      } else if (this.scan(/let/)) {
+      } else if (this.scan(/let\b/)) {
         tokens.push(new Let(line));
-      } else if (this.scan(/while/)) {
+      } else if (this.scan(/while\b/)) {
         tokens.push(new While(line));
-      } else if (this.scan(/export/)) {
+      } else if (this.scan(/export\b/)) {
         tokens.push(new Export(line));
-      } else if (this.scan(/default/)) {
+      } else if (this.scan(/default\b/)) {
         tokens.push(new Default(line));
-      } else if (this.scan(/do/)) {
+      } else if (this.scan(/do\b/)) {
         tokens.push(new Do(line));
+      } else if (this.scan(/for\b/)) {
+        tokens.push(new For(line));
+      } else if (this.scan(/of\b/)) {
+        tokens.push(new Of(line));
       } else if (this.scan(/\/.*\//)) {
         tokens.push(new Regex(line, this.matched));
-      } else if (this.scan(/continue/)) {
+      } else if (this.scan(/continue\b/)) {
         tokens.push(new Continue(line));
-      } else if (this.scan(/break/)) {
+      } else if (this.scan(/break\b/)) {
         tokens.push(new Break(line));
-      } else if (this.scan(/def/)) {
+      } else if (this.scan(/def\b/)) {
         tokens.push(new Def(line));
-      } else if (this.scan(/if/)) {
+      } else if (this.scan(/if\b/)) {
         tokens.push(new If(line));
-      } else if (this.scan(/else/)) {
+      } else if (this.scan(/else\b/)) {
         tokens.push(new Else(line));
-      } else if (this.scan(/end/)) {
+      } else if (this.scan(/end\b/)) {
         tokens.push(new End(line));
-      } else if (this.scan(/return/)) {
+      } else if (this.scan(/return\b/)) {
         tokens.push(new Return(line));
-      } else if (this.scan(/dataclass/)) {
+      } else if (this.scan(/dataclass\b/)) {
         tokens.push(new DataClass(line));
       } else if (this.scan(/".*"/)) {
         tokens.push(new Str(line, this.matched.slice(1, -1)));
-      } else if (this.scan(/class/)) {
+      } else if (this.scan(/class\b/)) {
         tokens.push(new Class(line));
-      } else if (this.scan(/get/)) {
+      } else if (this.scan(/get\b/)) {
         tokens.push(new Get(line));
-      } else if (this.scan(/new/)) {
+      } else if (this.scan(/new\b/)) {
         tokens.push(new New(line));
+      } else if (this.scan(/is\b/)) {
+        tokens.push(new Is(line));
+      } else if (this.scan(/not\b/)) {
+        tokens.push(new Not(line));
+      } else if (this.scan(/\.\.\./)) {
+        tokens.push(new Spread(line));
       } else if (this.scan(/\./)) {
         tokens.push(new Dot(line));
       } else if (this.scan(/\(/)) {
@@ -253,6 +317,10 @@ class Lexer {
         tokens.push(new OpenSquare(line));
       } else if (this.scan(/\]/)) {
         tokens.push(new CloseSquare(line));
+      } else if (this.scan(/\{/)) {
+        tokens.push(new OpenBrace(line));
+      } else if (this.scan(/\}/)) {
+        tokens.push(new CloseBrace(line));
       } else if (this.scan(/,/)) {
         tokens.push(new Comma(line));
       } else if (this.scan(/[a-zA-Z_]+\!/)) {
@@ -267,12 +335,18 @@ class Lexer {
         tokens.push(new Num(line, Number(this.matched), true));
       } else if (this.scan(/[\+\-\*\/\%\<\>]|>=|<=|&&|\|\||===|!==/)) {
         tokens.push(new JsOp(line, this.matched));
+      } else if (this.scan(/=>/)) {
+        tokens.push(new Arrow(line));
+      } else if (this.scan(/::/)) {
+        tokens.push(new Bind(line));
+      } else if (this.scan(/:/)) {
+        tokens.push(new Colon(line));
       } else if (this.scan(/=/)) {
         tokens.push(new Eq(line));
       } else if (this.scan(/\!/)) {
         tokens.push(new Bang(line));
       } else {
-        console.error("oh no");
+        panic("nothing found");
       }
     }
     return tokens;

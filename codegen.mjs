@@ -30,6 +30,18 @@ import {
   PropertyLookup,
   ExportDefault,
   ExportStatement,
+  SpreadExpr,
+  SimpleArg,
+  SpreadArg,
+  ArrowFn,
+  IsOperator,
+  BoundFunctionDef,
+  ForLoop,
+  IsNotOperator,
+  ParenExpr,
+  LetObjectDeconstruction,
+  RegularObjectProperty,
+  RenamedProperty,
 } from "./parser.mjs";
 import vm from "vm";
 
@@ -38,7 +50,12 @@ let eval_context = vm.createContext();
 class CodeGenError extends Error {}
 
 class CodeGen {
-  prelude = ``;
+  prelude = `
+class Panic extends Error {}
+function panic(reason) {
+  throw new Panic(reason);
+}
+`.trimStart();
 
   js = "";
   constructor(
@@ -68,8 +85,11 @@ class CodeGen {
     for (let statement of this.ast) {
       this.js += this.padding;
       let statement_js = this.eval_statement(statement);
-      if (!statement) this.js += this.eval_expr(statement);
-      else this.js += statement_js;
+      if (!statement_js) {
+        this.js += this.eval_expr(statement);
+      } else {
+        this.js += statement_js;
+      }
 
       this.js += ";\n";
     }
@@ -83,6 +103,8 @@ class CodeGen {
       return this.eval_function_call(statement);
     } else if (statement instanceof FunctionDef) {
       return this.eval_function_def(statement);
+    } else if (statement instanceof BoundFunctionDef) {
+      return this.eval_bound_function_def(statement);
     } else if (statement instanceof ReturnExpr) {
       return this.eval_return_expr(statement);
     } else if (statement instanceof DataClassDef) {
@@ -105,7 +127,10 @@ class CodeGen {
       return this.eval_export_default(statement);
     } else if (statement instanceof ExportStatement) {
       return this.eval_export_statement(statement);
-    } else {
+    } else if (statement instanceof ForLoop) {
+      return this.eval_for_loop(statement);
+    } else if (statement instanceof LetObjectDeconstruction) {
+      return this.eval_let_object_deconstruction(statement);
     }
   }
 
@@ -136,10 +161,61 @@ class CodeGen {
       return this.eval_array_literal(expr);
     } else if (expr instanceof PropertyLookup) {
       return this.eval_property_lookup(expr);
+    } else if (expr instanceof SpreadExpr) {
+      return this.eval_spread_expr(expr);
+    } else if (expr instanceof ArrowFn) {
+      return this.eval_arrow_fn(expr);
+    } else if (expr instanceof IsOperator) {
+      return this.eval_is_operator(expr);
+    } else if (expr instanceof IsNotOperator) {
+      return this.eval_is_not_operator(expr);
+    } else if (expr instanceof ParenExpr) {
+      return this.eval_paren_expr(expr);
     } else {
       console.log(expr);
       throw new CodeGenError();
     }
+  }
+
+  eval_let_object_deconstruction({ entries, rhs }) {
+    let js_entries = entries
+      .map((entry) => {
+        if (entry instanceof RegularObjectProperty) {
+          return entry.name;
+        } else if (entry instanceof RenamedProperty) {
+          return `${entry.old_name}: ${entry.new_name}`;
+        }
+      })
+      .join(",");
+
+    return `let { ${js_entries} } = ${this.eval_expr(rhs)}`;
+  }
+
+  eval_paren_expr({ expr }) {
+    return `(${this.eval_expr(expr)})`;
+  }
+
+  eval_for_loop({ iter_name, iterable_expr, body }) {
+    let f = `for (let ${iter_name} of ${this.eval_expr(iterable_expr)}) {\n`;
+    f += this.eval_body(body);
+    f += `${this.padding}}`;
+    return f;
+  }
+
+  eval_is_operator({ lhs, rhs }) {
+    return `${this.eval_expr(lhs)} instanceof ${this.eval_expr(rhs)}`;
+  }
+
+  eval_is_not_operator({ lhs, rhs }) {
+    return `!(${this.eval_expr(lhs)} instanceof ${this.eval_expr(rhs)})`;
+  }
+
+  eval_arrow_fn({ arg_name, return_expr }) {
+    return `(${arg_name}) => ${this.eval_expr(return_expr)}`;
+  }
+
+  eval_spread_expr({ expr }) {
+    return `...${this.eval_expr(expr)}`;
   }
 
   eval_export_default({ expr }) {
@@ -242,7 +318,8 @@ class CodeGen {
   }
 
   eval_method({ name, args, body }) {
-    let f = `  ${name}(${args.join(", ")}) {\n`;
+    let js_args = args.map(this.eval_function_arg).join(", ");
+    let f = `  ${name}(${js_args}) {\n`;
     f += this.eval_body(body, 4);
     f += `${this.padding}  }`;
     return f;
@@ -303,9 +380,15 @@ class CodeGen {
   }
 
   eval_command_expr({ name, expr }) {
-    if (name !== "comptime!") throw new CodeGenError();
-    let result = this.eval_expr(expr);
-    return vm.runInContext(this.js + result, eval_context);
+    if (name === "comptime!") {
+      let result = this.eval_expr(expr);
+      return vm.runInContext(this.js + result, eval_context);
+    } else if (name === "assert_not_reached!") {
+      let rhs = this.eval_expr(expr);
+      return `panic(${rhs})`;
+    } else {
+      throw new CodeGenError("not known command: " + name);
+    }
   }
 
   eval_id_lookup({ name }) {
@@ -338,10 +421,30 @@ class CodeGen {
     return `return ${this.eval_expr(expr)}`;
   }
 
-  eval_function_def({ name, args, body }) {
-    let f = `function ${name}(${args.join(", ")}) {\n`;
+  eval_function_arg(node) {
+    if (node instanceof SimpleArg) {
+      return node.name;
+    } else if (node instanceof SpreadArg) {
+      return `...${node.name}`;
+    } else {
+      console.log(node);
+      throw new CodeGenError("not support arg");
+    }
+  }
+
+  eval_bound_function_def({ name, args, body }) {
+    let js_args = args.map(this.eval_function_arg).join(", ");
+    let f = `let ${name} = (${js_args}) => {\n`;
     f += this.eval_body(body);
-    f += "}";
+    f += `${this.padding}}`;
+    return f;
+  }
+
+  eval_function_def({ name, args, body }) {
+    let js_args = args.map(this.eval_function_arg).join(", ");
+    let f = `function ${name}(${js_args}) {\n`;
+    f += this.eval_body(body);
+    f += `${this.padding}}`;
     return f;
   }
 }

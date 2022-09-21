@@ -1,3 +1,200 @@
-export dataclass Name
+class Parser(tokens)
+  index = 0
+  get cur_token = .tokens[.index]
+  get prev_token = .tokens[.index - 1]
 
-export default Name
+  def consume(TokenClass)
+    if .cur_token instanceof TokenClass
+      .index += 1
+      return .prev_token
+    else
+      assert_not_reached! "[lexer.lang:" + .cur_token.line + "] Expected " + TokenClass + ", got " + .cur_token.constructor
+    end
+  end
+
+
+  def clone_and_parse_until(...end_tokens)
+    let cloned = new Parser(.tokens)
+    cloned.index = .index
+    let result = cloned.parse(...end_tokens)
+    .index = cloned.index
+    return result
+  end
+
+
+  def parse(...end_tokens)
+    let ast = []
+
+    def ::has_reached_end_token
+      return false if end_tokens.length === 0
+      return end_tokens.some(EndTokenClass => .cur_token is EndTokenClass)
+    end
+
+
+    while .index < .tokens.length && !has_reached_end_token() do
+      let statement_or_expr = .parse_statement()
+      
+      if !statement_or_expr
+        statement_or_expr = .parse_expr()
+        if !statement_or_expr
+          console.log(.prev_token, .cur_token, .tokens[.index + 1])
+          assert_not_reached! "can't parse statement or expr"
+        end
+      end
+
+      if .scan(If) && .prev_token.line === .cur_token.line
+        statement_or_expr = .parse_postfix_if(statement_or_expr)
+      end
+
+      ast.push(statement_or_expr)
+    end
+  end
+
+
+  def scan(...TokenClasses)
+    let i = 0
+    for let TokenClass of TokenClasses do
+      if .tokens[.index + i] is not TokenClass
+        return false
+      end
+      i += 1
+    end
+    return true
+  end
+
+
+  def parse_statement
+    if .scan(Let)
+      return .parse_let()
+    else if .scan(Def, Bind)
+      return .parse_bound_def()
+    else if .scan(Def)
+      return .parse_def()
+    else if .scan(DataClass)
+      return .parse_data_class_def()
+    else if .scan(Return)
+      return .parse_return()
+    else if .scan(Continue)
+      return .parse_continue()
+    else if .scan(Break)
+      return .parse_break()
+    else if .scan(Class)
+      return .parse_class()
+    else if .scan(If)
+      return .parse_if()
+    else if .scan(While)
+      return .parse_while()
+    else if .scan(Export, Default)
+      return .parse_export_default()
+    else if .scan(Export)
+      return .parse_export()
+    else if .scan(For)
+      return .parse_for_loop()
+    end
+  end
+
+
+  def first_parse_expr
+    if .scan(Num)
+      return .parse_num()
+    else if .scan(Regex)
+      return .parse_regex()
+    else if .scan(Str)
+      return .parse_str()
+    else if .scan(Id, Arrow)
+      return .parse_arrow_fn()
+    else if .scan(Id)
+      return .parse_id_lookup()
+    else if .scan(Command)
+      return .parse_command()
+    else if .scan(New)
+      return .parse_new_expr()
+    else if .scan(Bang)
+      return .parse_not_expr()
+    else if .scan(OpenSquare)
+      return .parse_array()
+    else if .scan(Spread)
+      return .parse_spread()
+    else if .scan(Dot, Id)
+      return .parse_prefix_dot_lookup()
+    end
+  end
+
+  ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup]
+  def parse_node_plus_assignment(lhs_expr)
+    .consume(PlusEq)
+    let rhs_expr = .parse_expr()
+    return new NodePlusAssignment(lhs_expr, rhs_expr)
+  end
+
+  def can_assign(expr)
+    return (.scan(Eq) || .scan(PlusEq)) && 
+      .ASSIGNABLE_NODES.includes(expr.constructor)
+  end
+
+  def parse_expr_assignment(expr)
+    if .scan(Eq)
+      return .parse_node_assignment(expr)
+    else if .scan(PlusEq)
+      return .parse_node_plus_assignment(expr)
+    else
+      assert_not_reached! "cannot assign"
+    end
+  end
+
+  def is_dot_access 
+    return .scan(Dot) && .prev_token.line === .cur_token.line
+  end
+
+  def is_property_lookup
+    return .scan(OpenSquare) && .prev_token.line === .cur_token.line
+  end
+
+
+  def parse_expr
+    let expr = .first_parse_expr()
+    return undefined if !expr
+
+    while true do
+      if .scan(JsOp)
+        expr = .parse_js_op(expr)
+      else if .is_dot_access()
+        expr = .parse_dot_access(expr)
+      else if .is_property_lookup()
+        expr = .parse_property_lookup(expr)
+      else if .scan(OpenParen)
+        expr = .parse_function_call(expr)
+      else if .scan(Is, Not)
+        expr = .parse_is_not_operator(expr)
+      else if .scan(Is)
+        expr = .parse_is_operator(expr)
+      else if .can_assign(expr)
+        return .parse_expr_assignment(expr)
+      else
+        break
+      end
+    end
+
+    return expr
+  end
+
+  def parse_paren_expr
+    .consume(OpenParen)
+    let expr = .parse_expr()
+    .consume(CloseParen)
+    return new ParenExpr(expr)
+  end
+
+
+  def parse_for_loop
+    .consume(For)
+    .consume(Let)
+    let { name: iter_name } = .consume(Id)
+    .consume(Of)
+    let iterable_expr = .parse_expr()
+    .consume(Do)
+    let body = .clone_and_parse_until(End)
+    .consume(End)
+    return new ForLoop(iter_name, iterable_expr, body)
+  end
+end

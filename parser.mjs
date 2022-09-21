@@ -30,6 +30,16 @@ import {
   Break,
   Export,
   Default,
+  Spread,
+  Arrow,
+  Is,
+  Bind,
+  Not,
+  For,
+  Of,
+  OpenBrace,
+  CloseBrace,
+  Colon,
 } from "./dist/lexer.mjs";
 
 class ParseError extends Error {}
@@ -229,6 +239,86 @@ export class ExportStatement {
   }
 }
 
+export class SpreadExpr {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+export class SpreadArg {
+  constructor(name) {
+    this.name = name;
+  }
+}
+
+export class SimpleArg {
+  constructor(name) {
+    this.name = name;
+  }
+}
+
+export class ArrowFn {
+  constructor(arg_name, return_expr) {
+    this.arg_name = arg_name;
+    this.return_expr = return_expr;
+  }
+}
+
+export class IsOperator {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+
+export class IsNotOperator {
+  constructor(lhs, rhs) {
+    this.lhs = lhs;
+    this.rhs = rhs;
+  }
+}
+export class BoundFunctionDef {
+  constructor(name, args, body) {
+    this.name = name;
+    this.args = args;
+    this.body = body;
+  }
+}
+
+export class ForLoop {
+  constructor(iter_name, iterable_expr, body) {
+    this.iter_name = iter_name;
+    this.iterable_expr = iterable_expr;
+    this.body = body;
+  }
+}
+
+export class ParenExpr {
+  constructor(expr) {
+    this.expr = expr;
+  }
+}
+
+export class RenamedProperty {
+  constructor(old_name, new_name) {
+    this.old_name = old_name;
+    this.new_name = new_name;
+  }
+}
+
+export class RegularObjectProperty {
+  constructor(name) {
+    this.name = name;
+  }
+}
+
+export class LetObjectDeconstruction {
+  constructor(entries, rhs) {
+    this.entries = entries;
+    this.rhs = rhs;
+  }
+}
+
 class Parser {
   index = 0;
   constructor(tokens) {
@@ -280,15 +370,17 @@ class Parser {
         statement_or_expr = this.parse_expr();
 
         if (!statement_or_expr) {
-          console.log(this.cur_token);
+          console.log(
+            this.prev_token,
+            this.cur_token,
+            this.tokens[this.index + 1]
+          );
           throw new ParseError();
         }
       }
 
       if (this.scan(If) && this.prev_token.line === this.cur_token.line) {
         statement_or_expr = this.parse_postfix_if(statement_or_expr);
-      } else if (this.scan(If)) {
-        throw new ParseError("Unexpected If");
       }
 
       ast.push(statement_or_expr);
@@ -309,8 +401,12 @@ class Parser {
   }
 
   parse_statement() {
-    if (this.scan(Let)) {
+    if (this.scan(Let, OpenBrace)) {
+      return this.parse_let_obj();
+    } else if (this.scan(Let)) {
       return this.parse_let();
+    } else if (this.scan(Def, Bind)) {
+      return this.parse_bound_def();
     } else if (this.scan(Def)) {
       return this.parse_def();
     } else if (this.scan(DataClass)) {
@@ -331,6 +427,8 @@ class Parser {
       return this.parse_export_default();
     } else if (this.scan(Export)) {
       return this.parse_export();
+    } else if (this.scan(For)) {
+      return this.parse_for_loop();
     }
   }
 
@@ -341,6 +439,10 @@ class Parser {
       return this.parse_regex();
     } else if (this.scan(Str)) {
       return this.parse_str();
+    } else if (this.scan(OpenParen)) {
+      return this.parse_paren_expr();
+    } else if (this.scan(Id, Arrow)) {
+      return this.parse_arrow_fn();
     } else if (this.scan(Id)) {
       return this.parse_id_lookup();
     } else if (this.scan(Command)) {
@@ -351,6 +453,8 @@ class Parser {
       return this.parse_not_expr();
     } else if (this.scan(OpenSquare)) {
       return this.parse_array();
+    } else if (this.scan(Spread)) {
+      return this.parse_spread();
     } else if (this.scan(Dot, Id)) {
       return this.parse_prefix_dot_lookup();
     }
@@ -369,39 +473,103 @@ class Parser {
     return new NodePlusAssignment(lhs_expr, rhs_expr);
   }
 
+  can_assign(expr) {
+    return (
+      (this.scan(Eq) || this.scan(PlusEq)) &&
+      this.ASSIGNABLE_NODES.includes(expr.constructor)
+    );
+  }
+
+  parse_expr_assignment(expr) {
+    if (this.scan(Eq)) {
+      return this.parse_node_assignment(expr);
+    } else if (this.scan(PlusEq)) {
+      return this.parse_node_plus_assignment(expr);
+    } else {
+      throw new ParseError("not applicable parse");
+    }
+  }
+
+  is_dot_access() {
+    return this.scan(Dot) && this.prev_token.line === this.cur_token.line;
+  }
+
+  is_property_lookup() {
+    return (
+      this.scan(OpenSquare) && this.prev_token.line === this.cur_token.line
+    );
+  }
+
   parse_expr() {
     let expr = this.first_parse_expr();
     if (!expr) return;
 
-    if (this.ASSIGNABLE_NODES.includes(expr.constructor)) {
-      if (this.scan(Eq)) {
-        return this.parse_node_assignment(expr);
-      } else if (this.scan(PlusEq)) {
-        return this.parse_node_plus_assignment(expr);
-      }
-    }
-
     while (true) {
       if (this.scan(JsOp)) {
         expr = this.parse_js_op(expr);
-      } else if (
-        this.scan(Dot) &&
-        this.prev_token.line === this.cur_token.line
-      ) {
+      } else if (this.is_dot_access()) {
         expr = this.parse_dot_access(expr);
-      } else if (
-        this.scan(OpenSquare) &&
-        this.prev_token.line === this.cur_token.line
-      ) {
+      } else if (this.is_property_lookup()) {
         expr = this.parse_property_lookup(expr);
       } else if (this.scan(OpenParen)) {
         expr = this.parse_function_call(expr);
+      } else if (this.scan(Is, Not)) {
+        expr = this.parse_is_not_operator(expr);
+      } else if (this.scan(Is)) {
+        expr = this.parse_is_operator(expr);
+      } else if (this.can_assign(expr)) {
+        return this.parse_expr_assignment(expr);
       } else {
         break;
       }
     }
 
     return expr;
+  }
+
+  parse_paren_expr() {
+    this.consume(OpenParen);
+    let expr = this.parse_expr();
+    this.consume(CloseParen);
+    return new ParenExpr(expr);
+  }
+
+  parse_for_loop() {
+    this.consume(For);
+    this.consume(Let);
+    let { name: iter_name } = this.consume(Id);
+    this.consume(Of);
+    let iterable_expr = this.parse_expr();
+    this.consume(Do);
+    let body = this.clone_and_parse_until(End);
+    this.consume(End);
+    return new ForLoop(iter_name, iterable_expr, body);
+  }
+
+  parse_is_not_operator(lhs) {
+    this.consume(Is);
+    this.consume(Not);
+    let rhs = this.parse_expr();
+    return new IsNotOperator(lhs, rhs);
+  }
+
+  parse_is_operator(lhs) {
+    this.consume(Is);
+    let rhs = this.parse_expr();
+    return new IsOperator(lhs, rhs);
+  }
+
+  parse_arrow_fn() {
+    let { name: arg_name } = this.consume(Id);
+    this.consume(Arrow);
+    let return_expr = this.parse_expr();
+    return new ArrowFn(arg_name, return_expr);
+  }
+
+  parse_spread() {
+    this.consume(Spread);
+    let expr = this.parse_expr();
+    return new SpreadExpr(expr);
   }
 
   parse_export_default() {
@@ -553,14 +721,34 @@ class Parser {
     return new NewExpr(expr);
   }
 
-  parse_arg_names() {
+  parse_arg_defs() {
     this.consume(OpenParen);
     let args = [];
     while (!(this.cur_token instanceof CloseParen)) {
-      let { name: arg_name } = this.consume(Id);
-      args.push(arg_name);
+      if (this.scan(Id)) {
+        let { name: arg_name } = this.consume(Id);
+        args.push(new SimpleArg(arg_name));
+      } else if (this.scan(Spread)) {
+        this.consume(Spread);
+        let { name: arg_name } = this.consume(Id);
+        args.push(new SpreadArg(arg_name));
+      } else {
+        throw new ParseError("arg type not supported");
+      }
       if (!this.scan(Comma)) break;
       this.consume(Comma);
+    }
+    this.consume(CloseParen);
+    return args;
+  }
+
+  parse_arg_names() {
+    this.consume(OpenParen);
+    let args = [];
+    while (!this.scan(CloseParen)) {
+      let { name } = this.consume(Id);
+      args.push(name);
+      if (!this.scan(CloseParen)) this.consume(Comma);
     }
     this.consume(CloseParen);
     return args;
@@ -589,11 +777,23 @@ class Parser {
     this.consume(Break);
     return new BreakStatement();
   }
+
+  parse_bound_def() {
+    this.consume(Def);
+    this.consume(Bind);
+    let { name } = this.consume(Id);
+    let args = [];
+    if (this.scan(OpenParen)) args = this.parse_arg_defs();
+    let body = this.clone_and_parse_until(End);
+    this.consume(End);
+    return new BoundFunctionDef(name, args, body);
+  }
+
   parse_def() {
     this.consume(Def);
     let { name } = this.consume(Id);
     let args = [];
-    if (this.scan(OpenParen)) args = this.parse_arg_names();
+    if (this.scan(OpenParen)) args = this.parse_arg_defs();
     let body = this.clone_and_parse_until(End);
     this.consume(End);
     return new FunctionDef(name, args, body);
@@ -643,6 +843,42 @@ class Parser {
   parse_num() {
     let { value } = this.consume(Num);
     return new NumExpr(value);
+  }
+
+  parse_renamed_property() {
+    let { name: old_name } = this.consume(Id);
+    this.consume(Colon);
+    let { name: new_name } = this.consume(Id);
+    return new RenamedProperty(old_name, new_name);
+  }
+
+  parse_regular_object_property() {
+    let { name } = this.consume(Id);
+    return new RegularObjectProperty(name);
+  }
+
+  parse_obj_deconstruction_entry() {
+    if (this.scan(Id, Colon)) {
+      return this.parse_renamed_property();
+    } else if (this.scan(Id)) {
+      return this.parse_regular_object_property();
+    } else {
+      throw new ParseError("unknown object deconstruction entry");
+    }
+  }
+
+  parse_let_obj() {
+    this.consume(Let);
+    this.consume(OpenBrace);
+    let entries = [];
+    while (!this.scan(CloseBrace)) {
+      entries.push(this.parse_obj_deconstruction_entry());
+      if (!this.scan(CloseBrace)) this.consume(Comma);
+    }
+    this.consume(CloseBrace);
+    this.consume(Eq);
+    let rhs = this.parse_expr();
+    return new LetObjectDeconstruction(entries, rhs);
   }
 
   parse_let() {
