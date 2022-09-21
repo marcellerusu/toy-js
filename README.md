@@ -29,6 +29,6 @@ let p = new Person("marcelle", 25)
 
 class Lexer(program_string)
 
-# more, see the .lang source files for mroe
+# more, see the .lang source files for more
 
 ```
