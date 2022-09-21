@@ -63,7 +63,10 @@ class Lexer(str)
   def parse_str
     let str = ""
     .index += 1
-    while .cur !== "\"" || (.str[.index - 1] === "\\" && .str[.index - 2] !== "\\") do
+    while
+      .cur !== "\"" ||
+      (.str[.index - 1] === "\\" && .str[.index - 2] !== "\\")
+    do
       str += .cur
       .index += 1
       assert_not_reached! "no new lines" if .cur === "\n"

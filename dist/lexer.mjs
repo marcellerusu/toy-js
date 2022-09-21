@@ -1,27 +1,3 @@
-{
-  parsed_str: "";
-}
-{
-  parsed_str: '\\"';
-}
-{
-  parsed_str: "\\\\";
-}
-{
-  parsed_str: "\\\\";
-}
-{
-  parsed_str: "no new lines";
-}
-{
-  parsed_str: "\\n";
-}
-{
-  parsed_str: '\\"';
-}
-{
-  parsed_str: "nothing found";
-}
 class Panic extends Error {}
 function panic(reason) {
   throw new Panic(reason);
