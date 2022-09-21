@@ -7,7 +7,7 @@ See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=P
 # Progress
 
 - [x] can compile the lexer
-- [ ] can compile the parser
+- [x] can compile the parser
 - [ ] can compile the codegen
 
 # Syntax
@@ -29,6 +29,6 @@ let p = new Person("marcelle", 25)
 
 class Lexer(program_string)
 
-# more, see lexer.lang for more complete set of features
+# more, see the .lang source files for mroe
 
 ```
