@@ -42,7 +42,8 @@ import {
   LetObjectDeconstruction,
   RegularObjectProperty,
   RenamedProperty,
-} from "./parser.mjs";
+  ImportStatement,
+} from "./dist/parser.mjs";
 import vm from "vm";
 
 let eval_context = vm.createContext();
@@ -131,6 +132,8 @@ function panic(reason) {
       return this.eval_for_loop(statement);
     } else if (statement instanceof LetObjectDeconstruction) {
       return this.eval_let_object_deconstruction(statement);
+    } else if (statement instanceof ImportStatement) {
+      return this.eval_import_statement(statement);
     }
   }
 
@@ -175,6 +178,9 @@ function panic(reason) {
       console.log(expr);
       throw new CodeGenError();
     }
+  }
+  eval_import_statement({ imports, path }) {
+    return `import { ${imports.join(", ")} } from "${path}"`;
   }
 
   eval_let_object_deconstruction({ entries, rhs }) {

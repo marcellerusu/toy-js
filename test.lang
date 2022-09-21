@@ -1,10 +1,64 @@
+import {
+  Let, Id, Eq, Num, OpenParen, CloseParen, Comma,
+  Command, JsOp, Def, Return, End, DataClass, New, Dot,
+  Class, Get, Str, Bang, OpenSquare, CloseSquare,
+  If, Else, PlusEq, While, Do, Regex, Continue,
+  Break, Export, Default, Spread, Arrow, Is, Bind,
+  Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From
+} from "./dist/lexer.mjs"
+
+export dataclass NamedLet(name, expr)
+export dataclass NumExpr(value)
+export dataclass RegexNode(value)
+export dataclass StrExpr(value)
+export dataclass FunctionCall(lhs_expr, args)
+export dataclass IdLookup(name)
+export dataclass CommandExpr(name, expr)
+export dataclass JsOpExpr(lhs, type, rhs)
+export dataclass FunctionDef(name, args, body)
+export dataclass ReturnExpr(expr)
+export dataclass ContinueStatement
+export dataclass BreakStatement
+export dataclass NewExpr(expr)
+export dataclass NotExpr(expr)
+export dataclass DataClassDef(name, properties)
+export dataclass DotAccess(lhs, property)
+export dataclass ClassDef(name, properties, entries)
+export dataclass ClassInstanceEntry(name, expr)
+export dataclass ClassGetterExpr(name, expr)
+export dataclass PrefixDotLookup(name)
+export dataclass ArrayLiteral(elements)
+export dataclass IfStatement(branches)
+export dataclass IfBranch(test_expr, body)
+export dataclass ElseIfBranch(test_expr, body)
+export dataclass ElseBranch(body)
+export dataclass NodeAssignment(lhs_expr, rhs_expr)
+export dataclass NodePlusAssignment(lhs_expr, rhs_expr)
+export dataclass WhileStatement(test_expr, body)
+export dataclass PropertyLookup(lhs, property)
+export dataclass ExportDefault(expr)
+export dataclass ExportStatement(statement)
+export dataclass SpreadExpr(expr)
+export dataclass SpreadArg(name)
+export dataclass SimpleArg(name)
+export dataclass ArrowFn(arg_name, return_expr)
+export dataclass IsOperator(lhs, rhs)
+export dataclass IsNotOperator(lhs, rhs)
+export dataclass BoundFunctionDef(name, args, body)
+export dataclass ForLoop(iter_name, iterable_expr, body)
+export dataclass ParenExpr(expr)
+export dataclass RenamedProperty(old_name, new_name)
+export dataclass RegularObjectProperty(name)
+export dataclass LetObjectDeconstruction(entries, rhs)
+export dataclass ImportStatement(imports, path)
+
 class Parser(tokens)
   index = 0
   get cur_token = .tokens[.index]
   get prev_token = .tokens[.index - 1]
 
   def consume(TokenClass)
-    if .cur_token instanceof TokenClass
+    if .cur_token is TokenClass
       .index += 1
       return .prev_token
     else
@@ -88,11 +142,12 @@ class Parser(tokens)
       return .parse_export_default()
     else if .scan(Export)
       return .parse_export()
+    else if .scan(Import)
+      return .parse_import()
     else if .scan(For)
       return .parse_for_loop()
     end
   end
-
 
   def first_parse_expr
     if .scan(Num)
@@ -178,13 +233,27 @@ class Parser(tokens)
     return expr
   end
 
+  def parse_import
+    .consume(Import)
+    .consume(OpenBrace)
+    let imports = []
+    while !.scan(CloseBrace) do
+      let { name } = .consume(Id)
+      imports.push(name)
+      .consume(Comma) if !.scan(CloseBrace)
+    end
+    .consume(CloseBrace)
+    .consume(From)
+    let { value: path } = .consume(Str)
+    return new ImportStatement(imports, path)
+  end
+
   def parse_paren_expr
     .consume(OpenParen)
     let expr = .parse_expr()
     .consume(CloseParen)
     return new ParenExpr(expr)
   end
-
 
   def parse_for_loop
     .consume(For)
@@ -197,4 +266,347 @@ class Parser(tokens)
     .consume(End)
     return new ForLoop(iter_name, iterable_expr, body)
   end
+
+  def parse_is_not_operator(lhs)
+    .consume(Is)
+    .consume(Not)
+    let rhs = .parse_expr()
+    return new IsNotOperator(lhs, rhs)
+  end
+
+  def parse_is_operator(lhs)
+    .consume(Is)
+    let rhs = .parse_expr()
+    return new IsOperator(lhs, rhs)
+  end
+
+  def parse_arrow_fn
+    let { name: arg_name } = .consume(Id)
+    .consume(Arrow)
+    let return_expr = .parse_expr()
+    return new ArrowFn(arg_name, return_expr)
+  end
+
+  def parse_spread
+    .consume(Spread)
+    let expr = .parse_expr()
+    return new SpreadExpr(expr)
+  end
+
+  def parse_export_default
+    .consume(Export)
+    .consume(Default)
+    let expr = .parse_expr()
+    return new ExportDefault(expr)
+  end
+  
+  def parse_export
+    .consume(Export)
+    let statement = .parse_statement()
+    return new ExportStatement(statement)
+  end
+
+  def parse_property_lookup(lhs)
+    .consume(OpenSquare)
+    let property = .parse_expr()
+    .consume(CloseSquare)
+    return new PropertyLookup(lhs, property)
+  end
+
+  def parse_while
+    .consume(While)
+    let test_expr = .parse_expr()
+    .consume(Do)
+    let body = .clone_and_parse_until(End)
+    .consume(End)
+    return new WhileStatement(test_expr, body)
+  end
+
+  def parse_postfix_if(lhs)
+    .consume(If)
+    let test_expr = .parse_expr()
+    return new IfStatement([new IfBranch(test_expr, [lhs])])
+  end
+
+  def parse_else_if
+    .consume(Else)
+    .consume(If)
+    let test_expr = .parse_expr()
+    let body = .clone_and_parse_until(Else, End)
+    return new ElseIfBranch(test_expr, body)
+  end
+
+  def parse_else
+    .consume(Else)
+    let body = .clone_and_parse_until(End)
+    return new ElseBranch(body)
+  end
+
+  def parse_pass_branch
+    .consume(If)
+    let test_expr = .parse_expr()
+    let pass_body = .clone_and_parse_until(Else, End)
+    return new IfBranch(test_expr, pass_body)
+  end
+
+  def parse_if
+    let branches = []
+    branches.push(.parse_pass_branch())
+
+    while !.scan(End) do
+      if .scan(Else, If)
+        branches.push(.parse_else_if())
+      else if .scan(Else)
+        branches.push(.parse_else())
+      end
+    end
+
+    .consume(End)
+    return new IfStatement(branches)
+  end
+
+  def parse_array
+    let elements = []
+    .consume(OpenSquare)
+    while !.scan(CloseSquare) do
+      elements.push(.parse_expr())
+      .consume(Comma) if !.scan(CloseSquare)
+    end
+    .consume(CloseSquare)
+    return new ArrayLiteral(elements)
+  end
+
+  def parse_not_expr
+    .consume(Bang)
+    let expr = .parse_expr()
+    return new NotExpr(expr)
+  end
+
+  def parse_prefix_dot_lookup
+    .consume(Dot)
+    let { name } = .consume(Id)
+    return new PrefixDotLookup(name)
+  end
+
+  def parse_class_instance_entry
+    let { name } = .consume(Id)
+    .consume(Eq)
+    let expr = .parse_expr()
+    return new ClassInstanceEntry(name, expr)
+  end
+
+  def parse_getter
+    .consume(Get)
+    let { name } = .consume(Id)
+    .consume(Eq)
+    let expr = .parse_expr()
+    return new ClassGetterExpr(name, expr)
+  end
+
+  def parse_class_entry
+    if .scan(Id, Eq)
+      return .parse_class_instance_entry()
+    else if .scan(Get)
+      return .parse_getter()
+    else if .scan(Def)
+      return .parse_def()
+    else
+      assert_not_reached! "no class entry found"
+    end
+  end
+
+  def parse_class
+    .consume(Class)
+    let { name } = .consume(Id)
+    let properties = null
+    properties = .parse_arg_names() if .scan(OpenParen)
+    let entries = []
+    while !.scan(End) && .cur_token do
+      entries.push(.parse_class_entry())
+    end
+    .consume(End)
+    return new ClassDef(name, properties, entries)
+  end
+
+  def parse_dot_access(lhs)
+    .consume(Dot)
+    let { name: property } = .consume(Id)
+    return new DotAccess(lhs, property)
+  end
+
+  def parse_new_expr
+    .consume(New)
+    let expr = .parse_expr()
+    return new NewExpr(expr)
+  end
+
+  def parse_arg_defs
+    .consume(OpenParen)
+    let args = []
+    while .cur_token is not CloseParen do
+      if .scan(Id)
+        let { name: arg_name } = .consume(Id)
+        args.push(new SimpleArg(arg_name))
+      else if .scan(Spread)
+        .consume(Spread)
+        let { name: arg_name } = .consume(Id)
+        args.push(new SpreadArg(arg_name))
+      else
+        assert_not_reached! "arg type not supported"
+      end
+      break if !.scan(Comma)
+      .consume(Comma)
+    end
+    .consume(CloseParen)
+    return args
+  end
+
+  def parse_arg_names
+    .consume(OpenParen)
+    let args = []
+    while !.scan(CloseParen) do
+      let { name } = .consume(Id)
+      args.push(name)
+      .consume(Comma) if !.scan(CloseParen)
+    end
+    .consume(CloseParen)
+    return args
+  end
+
+  def parse_data_class_def
+    .consume(DataClass)
+    let { name } = .consume(Id)
+    let properties = null
+    properties = .parse_arg_names() if .scan(OpenParen)
+    return new DataClassDef(name, properties)
+  end
+
+  def parse_return
+    .consume(Return)
+    let expr = .parse_expr()
+    return new ReturnExpr(expr)
+  end
+
+  def parse_continue
+    .consume(Continue)
+    return new ContinueStatement()
+  end
+
+  def parse_break
+    .consume(Break)
+    return new BreakStatement()
+  end
+
+  def parse_bound_def
+    .consume(Def)
+    .consume(Bind)
+    let { name } = .consume(Id)
+    let args = []
+    args = .parse_arg_defs() if .scan(OpenParen)
+    let body = .clone_and_parse_until(End)
+    .consume(End)
+    return new BoundFunctionDef(name, args, body)
+  end
+
+  def parse_def
+    .consume(Def)
+    let { name } = .consume(Id)
+    let args = []
+    args = .parse_arg_defs() if .scan(OpenParen)
+    let body = .clone_and_parse_until(End)
+    .consume(End)
+    return new FunctionDef(name, args, body)
+  end
+
+  def parse_js_op(lhs_expr)
+    let { op } = .consume(JsOp)
+    let rhs_expr = .parse_expr()
+    return new JsOpExpr(lhs_expr, op, rhs_expr)
+  end
+
+  def parse_command
+    let { name } = .consume(Command)
+    let expr = .parse_expr()
+    assert_not_reached! "no expr" if !expr
+    return new CommandExpr(name, expr)
+  end
+
+  def parse_id_lookup
+    let { name } = .consume(Id)
+    return new IdLookup(name)
+  end
+
+  def parse_function_call(expr)
+    .consume(OpenParen)
+    let args = []
+    while .cur_token is not CloseParen do
+      let arg = .parse_expr()
+      args.push(arg)
+      break if !.scan(Comma)
+      .consume(Comma)
+    end
+    .consume(CloseParen)
+    return new FunctionCall(expr, args)
+  end
+
+  def parse_str
+    let { value } = .consume(Str)
+    return new StrExpr(value)
+  end
+
+  def parse_regex
+    let { value } = .consume(Regex)
+    return new RegexNode(value)
+  end
+
+  def parse_num
+    let { value } = .consume(Num)
+    return new NumExpr(value)
+  end
+
+  def parse_renamed_property
+    let { name: old_name } = .consume(Id)
+    .consume(Colon)
+    let { name: new_name } = .consume(Id)
+    return new RenamedProperty(old_name, new_name)
+  end
+
+  def parse_regular_object_property
+    let { name } = .consume(Id)
+    return new RegularObjectProperty(name)
+  end
+
+  def parse_obj_deconstruction_entry
+    if .scan(Id, Colon)
+      return .parse_renamed_property()
+    else if .scan(Id)
+      return .parse_regular_object_property()
+    else 
+      assert_not_reached! "unknown object deconstruction entry"
+    end
+  end
+
+  def parse_let_obj
+    .consume(Let)
+    .consume(OpenBrace)
+    let entries = []
+    while !.scan(CloseBrace) do
+      entries.push(.parse_obj_deconstruction_entry())
+      .consume(Comma) if !.scan(CloseBrace)
+    end
+    .consume(CloseBrace)
+    .consume(Eq)
+    let rhs = .parse_expr()
+    return new LetObjectDeconstruction(entries, rhs)
+  end
+
+  def parse_let
+    .consume(Let)
+    let { name } = .consume(Id)
+    .consume(Eq)
+    let expr = .parse_expr()
+    return new NamedLet(name, expr)
+  end
 end
+
+export default Parser

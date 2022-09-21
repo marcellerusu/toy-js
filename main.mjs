@@ -1,6 +1,6 @@
 import fs from "fs";
 import Lexer from "./dist/lexer.mjs";
-import Parser from "./parser.mjs";
+import Parser from "./dist/parser.mjs";
 import CodeGen from "./codegen.mjs";
 
 let [, , file_name] = process.argv;

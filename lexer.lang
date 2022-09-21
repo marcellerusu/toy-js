@@ -43,10 +43,13 @@ export dataclass Of(line)
 export dataclass OpenBrace(line)
 export dataclass CloseBrace(line)
 export dataclass Colon(line)
+export dataclass Import(line)
+export dataclass From(line)
 
 class Lexer(str)
   index = 0
   get rest_of_string = .str.slice(.index)
+  get cur = .str[.index]
 
   matched = null
   def scan(regex)
@@ -55,6 +58,18 @@ class Lexer(str)
     .index += result[0].length
     .matched = result[0]
     return true
+  end
+
+  def parse_str
+    let str = ""
+    .index += 1
+    while .cur !== "\"" || (.str[.index - 1] === "\\" && .str[.index - 2] !== "\\") do
+      str += .cur
+      .index += 1
+      assert_not_reached! "no new lines" if .cur === "\n"
+    end
+    .index += 1
+    return str
   end
 
   def tokenize
@@ -72,6 +87,10 @@ class Lexer(str)
         tokens.push(new While(line))
       else if .scan(/export\b/)
         tokens.push(new Export(line))
+      else if .scan(/import\b/)
+        tokens.push(new Import(line))
+      else if .scan(/from\b/)
+        tokens.push(new From(line))
       else if .scan(/default\b/)
         tokens.push(new Default(line))
       else if .scan(/do\b/)
@@ -98,8 +117,9 @@ class Lexer(str)
         tokens.push(new Return(line))
       else if .scan(/dataclass\b/)
         tokens.push(new DataClass(line))
-      else if .scan(/".*"/)
-        tokens.push(new Str(line, .matched.slice(1, -1)))
+      else if .cur === "\""
+        let parsed_str = .parse_str()
+        tokens.push(new Str(line, parsed_str))
       else if .scan(/class\b/)
         tokens.push(new Class(line))
       else if .scan(/get\b/)

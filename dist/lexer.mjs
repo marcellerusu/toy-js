@@ -1,3 +1,27 @@
+{
+  parsed_str: "";
+}
+{
+  parsed_str: '\\"';
+}
+{
+  parsed_str: "\\\\";
+}
+{
+  parsed_str: "\\\\";
+}
+{
+  parsed_str: "no new lines";
+}
+{
+  parsed_str: "\\n";
+}
+{
+  parsed_str: '\\"';
+}
+{
+  parsed_str: "nothing found";
+}
 class Panic extends Error {}
 function panic(reason) {
   throw new Panic(reason);
@@ -234,6 +258,16 @@ export class Colon {
     this.line = line;
   }
 }
+export class Import {
+  constructor(line) {
+    this.line = line;
+  }
+}
+export class From {
+  constructor(line) {
+    this.line = line;
+  }
+}
 class Lexer {
   constructor(str) {
     this.str = str;
@@ -241,6 +275,9 @@ class Lexer {
   index = 0;
   get rest_of_string() {
     return this.str.slice(this.index);
+  }
+  get cur() {
+    return this.str[this.index];
   }
   matched = null;
   scan(regex) {
@@ -251,6 +288,22 @@ class Lexer {
     this.index += result[0].length;
     this.matched = result[0];
     return true;
+  }
+  parse_str() {
+    let str = "";
+    this.index += 1;
+    while (
+      this.cur !== '"' ||
+      (this.str[this.index - 1] === "\\" && this.str[this.index - 2] !== "\\")
+    ) {
+      str += this.cur;
+      this.index += 1;
+      if (this.cur === "\n") {
+        panic("no new lines");
+      }
+    }
+    this.index += 1;
+    return str;
   }
   tokenize() {
     let tokens = [];
@@ -267,6 +320,10 @@ class Lexer {
         tokens.push(new While(line));
       } else if (this.scan(/export\b/)) {
         tokens.push(new Export(line));
+      } else if (this.scan(/import\b/)) {
+        tokens.push(new Import(line));
+      } else if (this.scan(/from\b/)) {
+        tokens.push(new From(line));
       } else if (this.scan(/default\b/)) {
         tokens.push(new Default(line));
       } else if (this.scan(/do\b/)) {
@@ -293,8 +350,9 @@ class Lexer {
         tokens.push(new Return(line));
       } else if (this.scan(/dataclass\b/)) {
         tokens.push(new DataClass(line));
-      } else if (this.scan(/".*"/)) {
-        tokens.push(new Str(line, this.matched.slice(1, -1)));
+      } else if (this.cur === '"') {
+        let parsed_str = this.parse_str();
+        tokens.push(new Str(line, parsed_str));
       } else if (this.scan(/class\b/)) {
         tokens.push(new Class(line));
       } else if (this.scan(/get\b/)) {
