@@ -1,3 +1,7 @@
+# Why am I doing this?
+
+https://justforfunnoreally.dev/
+
 # toy-js
 
 Toy compile to js language, developed as a youtube series to attempt to build a bootstrapped compiler/transpiler
