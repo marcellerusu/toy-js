@@ -55,6 +55,10 @@ export dataclass ArrComma
 export dataclass ArrNameEntry(name)
 export dataclass ImportStatement(imports, path)
 export dataclass DefaultImport(name, path)
+export dataclass NamedClassArg(name)
+export dataclass ObjClassArg(entries)
+export dataclass ObjClassArgEntry(name)
+export dataclass DefaultObjClassArg(name, expr)
 
 class Parser(tokens)
   index = 0
@@ -442,11 +446,50 @@ class Parser(tokens)
     end
   end
 
+  def parse_obj_args
+    .consume(OpenBrace)
+    let entries = []
+    while !.scan(CloseBrace) do
+      if .scan(Id, Eq)
+        let { name } = .consume(Id)
+        .consume(Eq)
+        let default_value = .parse_expr()
+        entries.push(new DefaultObjClassArg(name, default_value))
+      else if .scan(Id)
+        let { name } = .consume(Id)
+        entries.push(new ObjClassArgEntry(name))
+      end
+      .consume(Comma) if .scan(Comma)
+    end
+    .consume(CloseBrace)
+    return new ObjClassArg(entries)
+  end
+
+  def parse_class_arg
+    if .scan(Id)
+      let { name } = .consume(Id)
+      return new NamedClassArg(name)
+    else if .scan(OpenBrace)
+      return .parse_obj_args()
+    end
+  end
+
+  def parse_class_args
+    .consume(OpenParen)
+    let properties = []
+    while !.scan(CloseParen) do
+      properties.push(.parse_class_arg())
+      .consume(Comma) if .scan(Comma)
+    end
+    .consume(CloseParen)
+    return properties
+  end
+
   def parse_class
     .consume(Class)
     let { name } = .consume(Id)
     let properties = null
-    properties = .parse_arg_names() if .scan(OpenParen)
+    properties = .parse_class_args() if .scan(OpenParen)
     let entries = []
     while !.scan(End) && .cur_token do
       entries.push(.parse_class_entry())

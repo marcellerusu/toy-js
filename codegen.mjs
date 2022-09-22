@@ -47,6 +47,10 @@ import {
   LetArrDeconstruction,
   ArrNameEntry,
   ArrComma,
+  DefaultObjClassArg,
+  NamedClassArg,
+  ObjClassArg,
+  ObjClassArgEntry,
 } from "./dist/parser.mjs";
 import vm from "vm";
 
@@ -331,9 +335,27 @@ function panic(reason) {
   }
 
   eval_implicit_constructor_helper(properties) {
-    let c = `${this.padding}  constructor(${properties.join(", ")}) {\n`;
+    let args = properties
+      .map((arg) => {
+        if (arg instanceof NamedClassArg) {
+          return `${arg.name}`;
+        } else if (arg instanceof ObjClassArg) {
+          let entries_js = arg.entries.map(({ name }) => name).join(", ");
+          let default_js = arg.entries
+            .filter((entry) => entry instanceof DefaultObjClassArg)
+            .map(({ name, expr }) => `${name} = ${this.eval_expr(expr)}`)
+            .join(", ");
+          return `{ ${entries_js} } = { ${default_js} }`;
+        }
+      })
+      .join(", ");
+
+    let c = `${this.padding}  constructor(${args}) {\n`;
     c +=
       properties
+        .flatMap(({ name, entries }) =>
+          entries ? entries.map(({ name }) => name) : name
+        )
         .map((property) => `${this.padding}    this.${property} = ${property};`)
         .join("\n") + "\n";
     c += `${this.padding}  }\n`;
