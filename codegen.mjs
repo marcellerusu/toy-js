@@ -50,7 +50,6 @@ import {
   DefaultObjClassArg,
   NamedClassArg,
   ObjClassArg,
-  ObjClassArgEntry,
 } from "./dist/parser.mjs";
 import vm from "vm";
 

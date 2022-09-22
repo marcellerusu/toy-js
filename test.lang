@@ -1,2 +1,131 @@
 class CodeGen(ast, { first_run = true, indentation = 0 })
+  prelude = "class Panic extends Error {}\n" +
+            "function panic(reason) {\n" +
+            "  throw new Panic(reason);\n" +
+            "}\n"
+  js = ""
+  get padding = Array(.indentation).join(" ")
+
+  def eval
+    if .first_run
+      .js = .prelude
+    else
+      .js = ""
+    end
+
+    for let statement of .ast do
+      .js += .padding
+      let statement_js = .eval_statement(statement)
+      if !statement_js
+        .js += .eval_expr(statement)
+      else
+        .js += statement_js
+      end
+      .js += ";\n"
+    end
+    return .js
+  end
+
+
+  def eval_statement(statement)
+    if statement is NamedLet
+      return .eval_let(statement)
+    else if statement is FunctionCall
+      return .eval_function_call(statement)
+    else if statement is FunctionDef
+      return .eval_function_def(statement)
+    else if statement is BoundFunctionDef
+      return .eval_bound_function_def(statement)
+    else if statement is ReturnExpr
+      return .eval_return_expr(statement)
+    else if statement is DataClassDef
+      return .eval_data_class_def(statement)
+    else if statement is ClassDef
+      return .eval_class_def(statement)
+    else if statement is IfStatement
+      return .eval_if_statement(statement)
+    else if statement is NodeAssignment
+      return .eval_node_assignment(statement)
+    else if statement is NodePlusAssignment
+      return .eval_node_plus_assignment(statement)
+    else if statement is WhileStatement
+      return .eval_while_statement(statement)
+    else if statement is ContinueStatement
+      return .eval_continue()
+    else if statement is BreakStatement
+      return .eval_break()
+    else if statement is ExportDefault
+      return .eval_export_default(statement)
+    else if statement is ExportStatement
+      return .eval_export_statement(statement)
+    else if statement is ForLoop
+      return .eval_for_loop(statement)
+    else if statement is LetObjectDeconstruction
+      return .eval_let_object_deconstruction(statement)
+    else if statement is ImportStatement
+      return .eval_import_statement(statement)
+    else if statement is DefaultImport
+      return .eval_default_import(statement)
+    else if statement is LetArrDeconstruction
+      return .eval_let_arr_deconstruction(statement)
+    end
+  end
+
+  def eval_expr(expr)
+    if expr is NumExpr
+      return .eval_num(expr)
+    else if expr is RegexNode
+      return .eval_regex_node(expr)
+    else if expr is StrExpr
+      return .eval_str(expr)
+    else if expr is IdLookup
+      return .eval_id_lookup(expr)
+    else if expr is FunctionCall
+      return .eval_function_call(expr)
+    else if expr is CommandExpr
+      return .eval_command_expr(expr)
+    else if expr is JsOpExpr
+      return .eval_js_op_expr(expr)
+    else if expr is NewExpr
+      return .eval_new_expr(expr)
+    else if expr is NotExpr
+      return .eval_not_expr(expr)
+    else if expr is DotAccess
+      return .eval_dot_access(expr)
+    else if expr is PrefixDotLookup
+      return .eval_prefix_dot_lookup(expr)
+    else if expr is ArrayLiteral
+      return .eval_array_literal(expr)
+    else if expr is PropertyLookup
+      return .eval_property_lookup(expr)
+    else if expr is SpreadExpr
+      return .eval_spread_expr(expr)
+    else if expr is ArrowFn
+      return .eval_arrow_fn(expr)
+    else if expr is IsOperator
+      return .eval_is_operator(expr)
+    else if expr is IsNotOperator
+      return .eval_is_not_operator(expr)
+    else if expr is ParenExpr
+      return .eval_paren_expr(expr)
+    else
+      console.log(expr)
+      assert_not_reached! "no expr"
+    end
+  end
+
+  def eval_let_arr_deconstruction({ entries, rhs })
+    let l = "let ["
+    for let entry of entries do
+      if entry is ArrComma
+        l += ", "
+      else if entry is ArrNameEntry
+        l += entry.name
+      else
+        assert_not_reached! "not valid array deconstruction property"
+      end
+    end
+    l += "] = " + .eval_expr(rhs)
+    return l
+  end
 end
