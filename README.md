@@ -4,15 +4,18 @@ https://justforfunnoreally.dev/
 
 # toy-js
 
-Toy compile to js language, developed as a youtube series to attempt to build a bootstrapped compiler/transpiler
+A compile-to-js language written in itself
 
 See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=PLEpvTEuFyPtrD2gYvX277Q8wMpAA3qz7R)
+
+The results are ~1500 lines of toy-js vs the ~2500 lines of javascript, meaning there's been a roughly 40% reduction in code size. This is mostly due to the dataclass syntax.
+
 
 # Progress
 
 - [x] can compile the lexer
 - [x] can compile the parser
-- [ ] can compile the codegen
+- [x] can compile the codegen
 
 # Syntax
 
