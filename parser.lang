@@ -28,6 +28,8 @@ export dataclass ClassInstanceEntry(name, expr)
 export dataclass ClassGetterExpr(name, expr)
 export dataclass PrefixDotLookup(name)
 export dataclass ArrayLiteral(elements)
+export dataclass ObjLit(entries)
+export dataclass SimpleObjEntry(name, expr)
 export dataclass IfStatement(branches)
 export dataclass IfBranch(test_expr, body)
 export dataclass ElseIfBranch(test_expr, body)
@@ -41,6 +43,7 @@ export dataclass ExportStatement(statement)
 export dataclass SpreadExpr(expr)
 export dataclass SpreadArg(name)
 export dataclass SimpleArg(name)
+export dataclass SimpleDefaultArg(name, expr)
 export dataclass ArrowFn(arg_name, return_expr)
 export dataclass IsOperator(lhs, rhs)
 export dataclass IsNotOperator(lhs, rhs)
@@ -185,6 +188,8 @@ class Parser(tokens)
       return .parse_not_expr()
     else if .scan(OpenSquare)
       return .parse_array()
+    else if .scan(OpenBrace)
+      return .parse_obj_lit()
     else if .scan(Spread)
       return .parse_spread()
     else if .scan(Dot, Id)
@@ -314,7 +319,7 @@ class Parser(tokens)
   def parse_arrow_fn
     let { name: arg_name } = .consume(Id)
     .consume(Arrow)
-    let return_expr = .parse_expr()
+    let return_expr = .parse_statement() || .parse_expr()
     return new ArrowFn(arg_name, return_expr)
   end
 
@@ -394,6 +399,20 @@ class Parser(tokens)
 
     .consume(End)
     return new IfStatement(branches)
+  end
+
+  def parse_obj_lit
+    let entries = []
+    .consume(OpenBrace)
+    while !.scan(CloseBrace) do
+      let { name } = .consume(Id)
+      .consume(Colon)
+      let expr = .parse_expr()
+      entries.push(new SimpleObjEntry(name, expr))
+      .consume(Comma) if .scan(Comma)
+    end
+    .consume(CloseBrace)
+    return new ObjLit(entries)
   end
 
   def parse_array
@@ -514,13 +533,20 @@ class Parser(tokens)
     .consume(OpenParen)
     let args = []
     while .cur_token is not CloseParen do
-      if .scan(Id)
+      if .scan(Id, Eq)
+        let { name: arg_name } = .consume(Id)
+        .consume(Eq)
+        let expr = .parse_expr()
+        args.push(new SimpleDefaultArg(arg_name, expr))
+      else if .scan(Id)
         let { name: arg_name } = .consume(Id)
         args.push(new SimpleArg(arg_name))
       else if .scan(Spread)
         .consume(Spread)
         let { name: arg_name } = .consume(Id)
         args.push(new SpreadArg(arg_name))
+      else if .scan(OpenBrace)
+        args.push(.parse_obj_args())
       else
         assert_not_reached! "arg type not supported"
       end
@@ -536,7 +562,7 @@ class Parser(tokens)
     let args = []
     while !.scan(CloseParen) do
       let { name } = .consume(Id)
-      args.push(name)
+      args.push(new NamedClassArg(name))
       .consume(Comma) if !.scan(CloseParen)
     end
     .consume(CloseParen)

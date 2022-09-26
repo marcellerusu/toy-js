@@ -157,6 +157,17 @@ export class ArrayLiteral {
     this.elements = elements;
   }
 }
+export class ObjLit {
+  constructor(entries) {
+    this.entries = entries;
+  }
+}
+export class SimpleObjEntry {
+  constructor(name, expr) {
+    this.name = name;
+    this.expr = expr;
+  }
+}
 export class IfStatement {
   constructor(branches) {
     this.branches = branches;
@@ -226,6 +237,12 @@ export class SpreadArg {
 export class SimpleArg {
   constructor(name) {
     this.name = name;
+  }
+}
+export class SimpleDefaultArg {
+  constructor(name, expr) {
+    this.name = name;
+    this.expr = expr;
   }
 }
 export class ArrowFn {
@@ -458,6 +475,8 @@ class Parser {
       return this.parse_not_expr();
     } else if (this.scan(OpenSquare)) {
       return this.parse_array();
+    } else if (this.scan(OpenBrace)) {
+      return this.parse_obj_lit();
     } else if (this.scan(Spread)) {
       return this.parse_spread();
     } else if (this.scan(Dot, Id)) {
@@ -578,7 +597,7 @@ class Parser {
   parse_arrow_fn() {
     let { name: arg_name } = this.consume(Id);
     this.consume(Arrow);
-    let return_expr = this.parse_expr();
+    let return_expr = this.parse_statement() || this.parse_expr();
     return new ArrowFn(arg_name, return_expr);
   }
   parse_spread() {
@@ -646,6 +665,21 @@ class Parser {
     }
     this.consume(End);
     return new IfStatement(branches);
+  }
+  parse_obj_lit() {
+    let entries = [];
+    this.consume(OpenBrace);
+    while (!this.scan(CloseBrace)) {
+      let { name } = this.consume(Id);
+      this.consume(Colon);
+      let expr = this.parse_expr();
+      entries.push(new SimpleObjEntry(name, expr));
+      if (this.scan(Comma)) {
+        this.consume(Comma);
+      }
+    }
+    this.consume(CloseBrace);
+    return new ObjLit(entries);
   }
   parse_array() {
     let elements = [];
@@ -761,13 +795,20 @@ class Parser {
     this.consume(OpenParen);
     let args = [];
     while (!(this.cur_token instanceof CloseParen)) {
-      if (this.scan(Id)) {
+      if (this.scan(Id, Eq)) {
+        let { name: arg_name } = this.consume(Id);
+        this.consume(Eq);
+        let expr = this.parse_expr();
+        args.push(new SimpleDefaultArg(arg_name, expr));
+      } else if (this.scan(Id)) {
         let { name: arg_name } = this.consume(Id);
         args.push(new SimpleArg(arg_name));
       } else if (this.scan(Spread)) {
         this.consume(Spread);
         let { name: arg_name } = this.consume(Id);
         args.push(new SpreadArg(arg_name));
+      } else if (this.scan(OpenBrace)) {
+        args.push(this.parse_obj_args());
       } else {
         panic("arg type not supported");
       }
@@ -784,7 +825,7 @@ class Parser {
     let args = [];
     while (!this.scan(CloseParen)) {
       let { name } = this.consume(Id);
-      args.push(name);
+      args.push(new NamedClassArg(name));
       if (!this.scan(CloseParen)) {
         this.consume(Comma);
       }

@@ -5,7 +5,7 @@ function panic(reason) {
 import fs from "fs";
 import Lexer from "./lexer.mjs";
 import Parser from "./parser.mjs";
-import CodeGen from "../codegen.mjs";
+import CodeGen from "./codegen.mjs";
 let [, , file_name] = process.argv;
 let str = fs.readFileSync(file_name).toString();
 let lexer = new Lexer(str);

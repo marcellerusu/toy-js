@@ -1,0 +1,497 @@
+import {
+  IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr,
+  JsOpExpr, FunctionDef, ReturnExpr, DataClassDef,
+  NewExpr, DotAccess, ClassDef, ClassInstanceEntry,
+  ClassGetterExpr, PrefixDotLookup, StrExpr,
+  NotExpr, ArrayLiteral, IfStatement, NodeAssignment,
+  NodePlusAssignment, WhileStatement, RegexNode,
+  ContinueStatement, BreakStatement, IfBranch,
+  ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault,
+  ExportStatement, SpreadExpr, SimpleArg, SpreadArg,
+  ArrowFn, IsOperator, BoundFunctionDef, ForLoop,
+  IsNotOperator, ParenExpr, LetObjectDeconstruction,
+  RegularObjectProperty, RenamedProperty, ImportStatement,
+  DefaultImport, LetArrDeconstruction, ArrNameEntry,
+  ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
+  SimpleDefaultArg, ObjLit, SimpleObjEntry
+} from "./parser.mjs"
+import vm from "vm"
+let eval_context = vm.createContext()
+
+class CodeGen(ast, { first_run = true, indentation = 0 })
+  prelude = "class Panic extends Error {}\n" +
+            "function panic(reason) {\n" +
+            "  throw new Panic(reason);\n" +
+            "}\n"
+  js = ""
+  get padding = Array(.indentation).join(" ")
+
+  def eval
+    if .first_run
+      .js = .prelude
+    else
+      .js = ""
+    end
+
+    for let statement of .ast do
+      .js += .padding
+      let statement_js = .eval_statement(statement)
+      if !statement_js
+        .js += .eval_expr(statement)
+      else
+        .js += statement_js
+      end
+      .js += ";\n"
+    end
+    return .js
+  end
+
+
+  def eval_statement(statement)
+    if statement is NamedLet
+      return .eval_let(statement)
+    else if statement is FunctionCall
+      return .eval_function_call(statement)
+    else if statement is FunctionDef
+      return .eval_function_def(statement)
+    else if statement is BoundFunctionDef
+      return .eval_bound_function_def(statement)
+    else if statement is ReturnExpr
+      return .eval_return_expr(statement)
+    else if statement is DataClassDef
+      return .eval_data_class_def(statement)
+    else if statement is ClassDef
+      return .eval_class_def(statement)
+    else if statement is IfStatement
+      return .eval_if_statement(statement)
+    else if statement is NodeAssignment
+      return .eval_node_assignment(statement)
+    else if statement is NodePlusAssignment
+      return .eval_node_plus_assignment(statement)
+    else if statement is WhileStatement
+      return .eval_while_statement(statement)
+    else if statement is ContinueStatement
+      return .eval_continue()
+    else if statement is BreakStatement
+      return .eval_break()
+    else if statement is ExportDefault
+      return .eval_export_default(statement)
+    else if statement is ExportStatement
+      return .eval_export_statement(statement)
+    else if statement is ForLoop
+      return .eval_for_loop(statement)
+    else if statement is LetObjectDeconstruction
+      return .eval_let_object_deconstruction(statement)
+    else if statement is ImportStatement
+      return .eval_import_statement(statement)
+    else if statement is DefaultImport
+      return .eval_default_import(statement)
+    else if statement is LetArrDeconstruction
+      return .eval_let_arr_deconstruction(statement)
+    end
+  end
+
+  def eval_expr(expr)
+    if expr is NumExpr
+      return .eval_num(expr)
+    else if expr is RegexNode
+      return .eval_regex_node(expr)
+    else if expr is StrExpr
+      return .eval_str(expr)
+    else if expr is IdLookup
+      return .eval_id_lookup(expr)
+    else if expr is FunctionCall
+      return .eval_function_call(expr)
+    else if expr is CommandExpr
+      return .eval_command_expr(expr)
+    else if expr is JsOpExpr
+      return .eval_js_op_expr(expr)
+    else if expr is NewExpr
+      return .eval_new_expr(expr)
+    else if expr is NotExpr
+      return .eval_not_expr(expr)
+    else if expr is DotAccess
+      return .eval_dot_access(expr)
+    else if expr is PrefixDotLookup
+      return .eval_prefix_dot_lookup(expr)
+    else if expr is ArrayLiteral
+      return .eval_array_literal(expr)
+    else if expr is ObjLit
+      return .eval_obj_lit(expr)
+    else if expr is PropertyLookup
+      return .eval_property_lookup(expr)
+    else if expr is SpreadExpr
+      return .eval_spread_expr(expr)
+    else if expr is ArrowFn
+      return .eval_arrow_fn(expr)
+    else if expr is IsOperator
+      return .eval_is_operator(expr)
+    else if expr is IsNotOperator
+      return .eval_is_not_operator(expr)
+    else if expr is ParenExpr
+      return .eval_paren_expr(expr)
+    else
+      console.log(expr)
+      assert_not_reached! "no expr"
+    end
+  end
+
+  def eval_let_arr_deconstruction({ entries, rhs })
+    let l = "let ["
+    for let entry of entries do
+      if entry is ArrComma
+        l += ", "
+      else if entry is ArrNameEntry
+        l += entry.name
+      else
+        assert_not_reached! "not valid array deconstruction property"
+      end
+    end
+    l += "] = " + .eval_expr(rhs)
+    return l
+  end
+
+  def eval_default_import({ name, path })
+    return "import " + name + " from " + "\"" + path + "\""
+  end
+
+  def eval_import_statement({ imports, path })
+    return "import { " + imports.join(", ") + " } from " + "\"" + path + "\""
+  end
+
+  def eval_let_object_deconstruction({ entries, rhs })
+    let js_entries = entries.
+      map(entry =>
+        if entry is RegularObjectProperty
+          entry.name
+        else if entry is RenamedProperty
+          entry.old_name + ": " + entry.new_name
+        end
+      ).
+      join(",")
+
+    return "let { " + js_entries + " } = " + .eval_expr(rhs)
+  end
+
+  def eval_paren_expr({ expr })
+    return "(" + .eval_expr(expr) + ")"
+  end
+
+  def eval_for_loop({ iter_name, iterable_expr, body })
+    let f = "for (let " + iter_name + " of " + .eval_expr(iterable_expr) + ") {\n"
+    f += .eval_body(body)
+    f += .padding + "}"
+    return f
+  end
+
+  def eval_is_operator({ lhs, rhs })
+    return .eval_expr(lhs) + " instanceof " + .eval_expr(rhs)
+  end
+
+  def eval_is_not_operator({ lhs, rhs })
+    return "!(" + .eval_expr(lhs) + " instanceof " + .eval_expr(rhs) + ")"
+  end
+
+  def eval_arrow_fn({ arg_name, return_expr })
+    if return_expr is IfStatement
+      return_expr.branches = return_expr.branches.map(branch =>
+        if branch.body.at(-1) is ReturnExpr
+          branch
+        else 
+          branch.body = [
+            ...branch.body.slice(0, -1),
+            new ReturnExpr(branch.body[branch.body.length - 1]),
+          ]
+          branch
+        end
+      )
+      let a = "(" + arg_name + ") => {\n"
+      a += .padding + .eval_if_statement(return_expr) + "\n"
+      a += .padding + "}"
+      return a
+    else
+      return "(" + arg_name + ") => " + .eval_expr(return_expr)
+    end
+  end
+
+  def eval_spread_expr({ expr })
+    return "..." + .eval_expr(expr)
+  end
+
+  def eval_export_default({ expr })
+    return "export default " + .eval_expr(expr)
+  end
+
+  def eval_export_statement({ statement })
+    return "export " + .eval_statement(statement)
+  end
+
+  def eval_property_lookup({ lhs, property })
+    return .eval_expr(lhs) + "[" + .eval_expr(property) + "]"
+  end
+
+  def eval_continue
+    return "continue"
+  end
+
+  def eval_break
+    return "break"
+  end
+
+  def eval_while_statement({ test_expr, body })
+    let w = "while (" + .eval_expr(test_expr) + ") {\n"
+    w += .eval_body(body)
+    w += .padding + "}"
+    return w
+  end
+
+  def eval_node_plus_assignment({ lhs_expr, rhs_expr })
+    let lhs = .eval_expr(lhs_expr)
+    let rhs = .eval_expr(rhs_expr)
+    return lhs + " += " + rhs
+  end
+
+  def eval_node_assignment({ lhs_expr, rhs_expr })
+    let lhs = .eval_expr(lhs_expr)
+    let rhs = .eval_expr(rhs_expr)
+    return lhs + " = " + rhs
+  end
+
+  def eval_body(body, indent_by = 2)
+    # let a = {}
+    return new CodeGen(body, {
+      indentation: .indentation + indent_by,
+      first_run: false
+    }).eval().trimEnd() + "\n"
+  end
+
+  def eval_if_statement({ branches })
+    let _if = ""
+    for let branch of branches do
+      if branch is IfBranch
+        _if += "if (" + .eval_expr(branch.test_expr) + ") {\n"
+        _if += .eval_body(branch.body)
+        _if += .padding + "}"
+      else if branch is ElseIfBranch
+        _if += " else if (" + .eval_expr(branch.test_expr)  + ") {\n"
+        _if += .eval_body(branch.body)
+        _if += .padding + "}"
+      else if branch is ElseBranch
+        _if += " else {\n"
+        _if += .eval_body(branch.body)
+        _if += .padding + "}"
+      end
+    end
+    return _if
+  end
+
+  def eval_array_literal({ elements })
+    return "[" + elements.map(.eval_expr.bind(this)).join(", ") + "]"
+  end
+
+  
+  def eval_obj_lit({ entries })
+    let l = "{ "
+    l += entries.map(entry =>
+      if entry is SimpleObjEntry
+        return entry.name + ": " + .eval_expr(entry.expr)
+      else
+        assert_not_reached! "invalid obj entry"
+      end
+    ).join(", ")
+    l += " }"
+    return l
+  end
+
+  def eval_prefix_dot_lookup({ name })
+    return "this." + name
+  end
+
+  def eval_obj_class_arg({ entries })
+    let entries_js = entries.map(entry => entry.name).join(", ")
+    if entries.some(entry => entry is DefaultObjClassArg)
+      let default_js = entries.
+        filter(entry => entry is DefaultObjClassArg).
+        map(entry => entry.name + ": " + .eval_expr(entry.expr)).
+        join(", ")
+      return "{ " + entries_js + " } = { " + default_js + " }"
+    else
+      return "{ " + entries_js + " }"
+    end
+  end
+
+  def eval_implicit_constructor_helper(properties)
+    let args = properties.
+      map(arg =>
+        if arg is NamedClassArg
+          arg.name
+        else if arg is ObjClassArg
+          .eval_obj_class_arg(arg)
+        end
+      ).
+      join(", ")
+
+    let c = .padding + "  constructor(" + args + ") {\n"
+    c +=
+      properties.
+        flatMap(property =>
+          if property.entries
+            property.entries.map(entry => entry.name)
+          else if property is NamedClassArg
+            return property.name
+          else
+            property
+          end
+        ).
+        map(property => .padding + "    this." + property + " = " + property + ";").
+        join("\n") + "\n"
+    c += .padding + "  }\n"
+    return c
+  end
+
+  def eval_class_instance_entry({ name, expr })
+    return .padding + "  " + name + " = " + .eval_expr(expr)
+  end
+
+  def eval_class_getter_expr({ name, expr })
+    let g = .padding + "  get " + name + "() {\n"
+    g += .padding + "    return " + .eval_expr(expr) + ";\n"
+    g += .padding + "  }"
+    return g
+  end
+
+  def eval_method({ name, args, body })
+    let js_args = args.map(.eval_function_arg.bind(this)).join(", ")
+    let f = "  " + name + "(" + js_args + ") {\n"
+    f += .eval_body(body, 4)
+    f += .padding + "  }"
+    return f
+  end
+
+  def eval_class_entry(entry)
+    if entry is ClassInstanceEntry
+      return .eval_class_instance_entry(entry)
+    else if entry is ClassGetterExpr
+      return .eval_class_getter_expr(entry)
+    else if entry is FunctionDef
+      return .eval_method(entry)
+    else
+      assert_not_reached! "not supported class entry - " + entry + " | " + typeof(entry)
+    end
+  end
+
+  def eval_class_def({ name, properties, entries })
+    let c = "class " + name + " {\n"
+    if properties
+      c += .eval_implicit_constructor_helper(properties)
+    end
+    for let entry of entries do
+      c += .eval_class_entry(entry) + ";\n"
+    end
+    c += "}"
+    return c
+  end
+
+  def eval_dot_access({ lhs, property })
+    return .eval_expr(lhs) + "." + property
+  end
+
+  def eval_new_expr({ expr })
+    return "new " + .eval_expr(expr)
+  end
+
+  def eval_not_expr({ expr })
+    return "!" + .eval_expr(expr)
+  end
+
+  def eval_empty_data_class_def(name)
+    return "class " + name + " {}"
+  end
+
+  def eval_data_class_def({ name, properties })
+    return .eval_empty_data_class_def(name) if !properties
+    let c = "class " + name + " {\n"
+    c += .eval_implicit_constructor_helper(properties)
+    c += .padding + "}"
+    return c
+  end
+
+  def eval_js_op_expr({ lhs, type, rhs })
+    return .eval_expr(lhs) + type + .eval_expr(rhs)
+  end
+
+  def eval_command_expr({ name, expr })
+    if name === "comptime!"
+      let result = .eval_expr(expr)
+      return vm.runInContext(.js + result, eval_context)
+    else if name === "assert_not_reached!"
+      let rhs = .eval_expr(expr)
+      return "panic(" + rhs + ")"
+    else
+      assert_not_reached! "not known command: " + name
+    end
+  end
+
+  def eval_id_lookup({ name })
+    return name
+  end
+
+  def eval_function_call({ lhs_expr, args })
+    let js_args = args.map(.eval_expr.bind(this)).join(", ")
+    return .eval_expr(lhs_expr) + "(" + js_args + ")"
+  end
+
+  def eval_num({ value, is_negative })
+    return "-" + value if is_negative
+    return value
+  end
+
+  def eval_regex_node({ value })
+    return value
+  end
+
+  def eval_str({ value })
+    return "\"" + value + "\""
+  end
+
+  def eval_let({ name, expr })
+    return "let " + name + " = " + .eval_expr(expr)
+  end
+
+  def eval_return_expr({ expr })
+    return "return " + .eval_expr(expr)
+  end
+
+  def eval_function_arg(node)
+    if node is SimpleArg
+      return node.name
+    else if node is SpreadArg
+      return "..." + node.name
+    else if node is SimpleDefaultArg
+      return node.name + " = " + .eval_expr(node.expr)
+    else if node is ObjClassArg
+      return .eval_obj_class_arg(node)
+    else
+      console.log(node)
+      assert_not_reached! "not support arg"
+    end
+  end
+
+  def eval_bound_function_def({ name, args, body })
+    let js_args = args.map(.eval_function_arg.bind(this)).join(", ")
+    let f = "let " + name + " = (" + js_args + ") => {\n"
+    f += .eval_body(body)
+    f += .padding + "}"
+    return f
+  end
+
+  def eval_function_def({ name, args, body })
+    let js_args = args.map(.eval_function_arg.bind(this)).join(", ")
+    let f = "function " + name + "(" + js_args + ") {\n"
+    f += .eval_body(body)
+    f += .padding + "}"
+    return f
+  end
+end
+
+export default CodeGen
