@@ -10,7 +10,6 @@ See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=P
 
 The results are as of bootstrapping there were ~1500 lines of toy-js vs the ~2000 lines of javascript, meaning there's been a roughly 25% reduction in code size. This is mostly due to the dataclass syntax.
 
-
 # Progress
 
 - [x] can compile the lexer
@@ -33,8 +32,6 @@ print(ten)
 dataclass Person(name, age)
 
 let p = new Person("marcelle", 25)
-
-class Lexer(program_string)
 
 # more, see the .lang source files for more
 
