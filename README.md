@@ -4,7 +4,7 @@ https://justforfunnoreally.dev/
 
 # toy-js
 
-Toy compile to js language, developed as a youtube series to attempt to build a bootstrapped compiler/transpiler
+A compile-to-js language written in itself
 
 See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=PLEpvTEuFyPtrD2gYvX277Q8wMpAA3qz7R)
 
@@ -12,7 +12,7 @@ See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=P
 
 - [x] can compile the lexer
 - [x] can compile the parser
-- [ ] can compile the codegen
+- [x] can compile the codegen
 
 # Syntax
 
