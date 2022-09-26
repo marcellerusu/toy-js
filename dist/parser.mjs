@@ -884,10 +884,12 @@ class Parser {
       body.push(expr);
     } else {
       body = this.clone_and_parse_until(End);
-      if (body.length > 0 && !(body.at(-1) instanceof ReturnExpr)) {
-        if (!(body.at(-1) instanceof IfStatement)) {
-          body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))];
-        }
+      if (
+        body.length > 0 &&
+        !(body.at(-1) instanceof ReturnExpr) &&
+        !(body.at(-1) instanceof IfStatement)
+      ) {
+        body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))];
       }
       this.consume(End);
     }

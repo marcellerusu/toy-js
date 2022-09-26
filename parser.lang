@@ -611,10 +611,8 @@ class Parser(tokens)
       body.push(expr)
     else
       body = .clone_and_parse_until(End)
-      if body.length > 0 && body.at(-1) is not ReturnExpr
-        if body.at(-1) is not IfStatement
-          body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))]
-        end
+      if body.length > 0 && (body.at(-1) is not ReturnExpr) && body.at(-1) is not IfStatement
+        body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))]
       end
       .consume(End)
     end
