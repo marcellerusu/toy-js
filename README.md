@@ -4,7 +4,7 @@ https://justforfunnoreally.dev/
 
 # toy-js
 
-A compile-to-js language written in itself
+A compile-to-js language written in itself (total ~1500 lines of toy-js)
 
 See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=PLEpvTEuFyPtrD2gYvX277Q8wMpAA3qz7R)
 
