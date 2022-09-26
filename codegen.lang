@@ -241,7 +241,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
   end
 
   def eval_body(body, indent_by = 2)
-    return new CodeGen(body, {
+    new CodeGen(body, {
       indentation: .indentation + indent_by,
       first_run: false
     }).eval().trimEnd() + "\n"

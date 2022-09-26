@@ -201,13 +201,13 @@ class Parser(tokens)
   def parse_node_assignment(lhs_expr)
     .consume(Eq)
     let rhs_expr = .parse_expr()
-    return new NodeAssignment(lhs_expr, rhs_expr)
+    new NodeAssignment(lhs_expr, rhs_expr)
   end
 
   def parse_node_plus_assignment(lhs_expr)
     .consume(PlusEq)
     let rhs_expr = .parse_expr()
-    return new NodePlusAssignment(lhs_expr, rhs_expr)
+    new NodePlusAssignment(lhs_expr, rhs_expr)
   end
 
   def can_assign(expr)
@@ -260,7 +260,7 @@ class Parser(tokens)
     let { name } = .consume(Id)
     .consume(From)
     let { value: path} = .consume(Str)
-    return new DefaultImport(name, path)
+    new DefaultImport(name, path)
   end
 
   def parse_obj_import
@@ -275,14 +275,14 @@ class Parser(tokens)
     .consume(CloseBrace)
     .consume(From)
     let { value: path } = .consume(Str)
-    return new ImportStatement(imports, path)
+    new ImportStatement(imports, path)
   end
 
   def parse_paren_expr
     .consume(OpenParen)
     let expr = .parse_expr()
     .consume(CloseParen)
-    return new ParenExpr(expr)
+    new ParenExpr(expr)
   end
 
   def parse_for_loop
@@ -294,53 +294,53 @@ class Parser(tokens)
     .consume(Do)
     let body = .clone_and_parse_until(End)
     .consume(End)
-    return new ForLoop(iter_name, iterable_expr, body)
+    new ForLoop(iter_name, iterable_expr, body)
   end
 
   def parse_is_not_operator(lhs)
     .consume(Is)
     .consume(Not)
     let rhs = .parse_expr()
-    return new IsNotOperator(lhs, rhs)
+    new IsNotOperator(lhs, rhs)
   end
 
   def parse_is_operator(lhs)
     .consume(Is)
     let rhs = .parse_expr()
-    return new IsOperator(lhs, rhs)
+    new IsOperator(lhs, rhs)
   end
 
   def parse_arrow_fn
     let { name: arg_name } = .consume(Id)
     .consume(Arrow)
     let return_expr = .parse_statement() || .parse_expr()
-    return new ArrowFn(arg_name, return_expr)
+    new ArrowFn(arg_name, return_expr)
   end
 
   def parse_spread
     .consume(Spread)
     let expr = .parse_expr()
-    return new SpreadExpr(expr)
+    new SpreadExpr(expr)
   end
 
   def parse_export_default
     .consume(Export)
     .consume(Default)
     let expr = .parse_expr()
-    return new ExportDefault(expr)
+    new ExportDefault(expr)
   end
   
   def parse_export
     .consume(Export)
     let statement = .parse_statement()
-    return new ExportStatement(statement)
+    new ExportStatement(statement)
   end
 
   def parse_property_lookup(lhs)
     .consume(OpenSquare)
     let property = .parse_expr()
     .consume(CloseSquare)
-    return new PropertyLookup(lhs, property)
+    new PropertyLookup(lhs, property)
   end
 
   def parse_while
@@ -349,13 +349,13 @@ class Parser(tokens)
     .consume(Do)
     let body = .clone_and_parse_until(End)
     .consume(End)
-    return new WhileStatement(test_expr, body)
+    new WhileStatement(test_expr, body)
   end
 
   def parse_postfix_if(lhs)
     .consume(If)
     let test_expr = .parse_expr()
-    return new IfStatement([new IfBranch(test_expr, [lhs])])
+    new IfStatement([new IfBranch(test_expr, [lhs])])
   end
 
   def parse_else_if
@@ -363,20 +363,20 @@ class Parser(tokens)
     .consume(If)
     let test_expr = .parse_expr()
     let body = .clone_and_parse_until(Else, End)
-    return new ElseIfBranch(test_expr, body)
+    new ElseIfBranch(test_expr, body)
   end
 
   def parse_else
     .consume(Else)
     let body = .clone_and_parse_until(End)
-    return new ElseBranch(body)
+    new ElseBranch(body)
   end
 
   def parse_pass_branch
     .consume(If)
     let test_expr = .parse_expr()
     let pass_body = .clone_and_parse_until(Else, End)
-    return new IfBranch(test_expr, pass_body)
+    new IfBranch(test_expr, pass_body)
   end
 
   def parse_if
@@ -392,7 +392,7 @@ class Parser(tokens)
     end
 
     .consume(End)
-    return new IfStatement(branches)
+    new IfStatement(branches)
   end
 
   def parse_obj_lit
@@ -406,7 +406,7 @@ class Parser(tokens)
       .consume(Comma) if .scan(Comma)
     end
     .consume(CloseBrace)
-    return new ObjLit(entries)
+    new ObjLit(entries)
   end
 
   def parse_array
@@ -417,26 +417,26 @@ class Parser(tokens)
       .consume(Comma) if !.scan(CloseSquare)
     end
     .consume(CloseSquare)
-    return new ArrayLiteral(elements)
+    new ArrayLiteral(elements)
   end
 
   def parse_not_expr
     .consume(Bang)
     let expr = .parse_expr()
-    return new NotExpr(expr)
+    new NotExpr(expr)
   end
 
   def parse_prefix_dot_lookup
     .consume(Dot)
     let { name } = .consume(Id)
-    return new PrefixDotLookup(name)
+    new PrefixDotLookup(name)
   end
 
   def parse_class_instance_entry
     let { name } = .consume(Id)
     .consume(Eq)
     let expr = .parse_expr()
-    return new ClassInstanceEntry(name, expr)
+    new ClassInstanceEntry(name, expr)
   end
 
   def parse_getter
@@ -444,7 +444,7 @@ class Parser(tokens)
     let { name } = .consume(Id)
     .consume(Eq)
     let expr = .parse_expr()
-    return new ClassGetterExpr(name, expr)
+    new ClassGetterExpr(name, expr)
   end
 
   def parse_class_entry
@@ -475,7 +475,7 @@ class Parser(tokens)
       .consume(Comma) if .scan(Comma)
     end
     .consume(CloseBrace)
-    return new ObjClassArg(entries)
+    new ObjClassArg(entries)
   end
 
   def parse_class_arg
@@ -508,19 +508,19 @@ class Parser(tokens)
       entries.push(.parse_class_entry())
     end
     .consume(End)
-    return new ClassDef(name, properties, entries)
+    new ClassDef(name, properties, entries)
   end
 
   def parse_dot_access(lhs)
     .consume(Dot)
     let { name: property } = .consume(Id)
-    return new DotAccess(lhs, property)
+    new DotAccess(lhs, property)
   end
 
   def parse_new_expr
     .consume(New)
     let expr = .parse_expr()
-    return new NewExpr(expr)
+    new NewExpr(expr)
   end
 
   def parse_arg_defs
@@ -568,23 +568,23 @@ class Parser(tokens)
     let { name } = .consume(Id)
     let properties = null
     properties = .parse_arg_names() if .scan(OpenParen)
-    return new DataClassDef(name, properties)
+    new DataClassDef(name, properties)
   end
 
   def parse_return
     .consume(Return)
     let expr = .parse_expr()
-    return new ReturnExpr(expr)
+    new ReturnExpr(expr)
   end
 
   def parse_continue
     .consume(Continue)
-    return new ContinueStatement()
+    new ContinueStatement()
   end
 
   def parse_break
     .consume(Break)
-    return new BreakStatement()
+    new BreakStatement()
   end
 
   def parse_bound_def
@@ -595,7 +595,7 @@ class Parser(tokens)
     args = .parse_arg_defs() if .scan(OpenParen)
     let body = .clone_and_parse_until(End)
     .consume(End)
-    return new BoundFunctionDef(name, args, body)
+    new BoundFunctionDef(name, args, body)
   end
 
   def parse_def
@@ -611,27 +611,32 @@ class Parser(tokens)
       body.push(expr)
     else
       body = .clone_and_parse_until(End)
+      if body.length > 0 && body.at(-1) is not ReturnExpr
+        if body.at(-1) is not IfStatement
+          body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))]
+        end
+      end
       .consume(End)
     end
-    return new FunctionDef(name, args, body)
+    new FunctionDef(name, args, body)
   end
 
   def parse_js_op(lhs_expr)
     let { op } = .consume(JsOp)
     let rhs_expr = .parse_expr()
-    return new JsOpExpr(lhs_expr, op, rhs_expr)
+    new JsOpExpr(lhs_expr, op, rhs_expr)
   end
 
   def parse_command
     let { name } = .consume(Command)
     let expr = .parse_expr()
     assert_not_reached! "no expr" if !expr
-    return new CommandExpr(name, expr)
+    new CommandExpr(name, expr)
   end
 
   def parse_id_lookup
     let { name } = .consume(Id)
-    return new IdLookup(name)
+    new IdLookup(name)
   end
 
   def parse_function_call(expr)
@@ -644,34 +649,34 @@ class Parser(tokens)
       .consume(Comma)
     end
     .consume(CloseParen)
-    return new FunctionCall(expr, args)
+    new FunctionCall(expr, args)
   end
 
   def parse_str
     let { value } = .consume(Str)
-    return new StrExpr(value)
+    new StrExpr(value)
   end
 
   def parse_regex
     let { value } = .consume(Regex)
-    return new RegexNode(value)
+    new RegexNode(value)
   end
 
   def parse_num
     let { value } = .consume(Num)
-    return new NumExpr(value)
+    new NumExpr(value)
   end
 
   def parse_renamed_property
     let { name: old_name } = .consume(Id)
     .consume(Colon)
     let { name: new_name } = .consume(Id)
-    return new RenamedProperty(old_name, new_name)
+    new RenamedProperty(old_name, new_name)
   end
 
   def parse_regular_object_property
     let { name } = .consume(Id)
-    return new RegularObjectProperty(name)
+    new RegularObjectProperty(name)
   end
 
   def parse_obj_deconstruction_entry
@@ -700,7 +705,7 @@ class Parser(tokens)
     .consume(CloseSquare)
     .consume(Eq)
     let rhs = .parse_expr()
-    return new LetArrDeconstruction(entries, rhs)
+    new LetArrDeconstruction(entries, rhs)
   end
 
   def parse_let_obj
@@ -714,7 +719,7 @@ class Parser(tokens)
     .consume(CloseBrace)
     .consume(Eq)
     let rhs = .parse_expr()
-    return new LetObjectDeconstruction(entries, rhs)
+    new LetObjectDeconstruction(entries, rhs)
   end
 
   def parse_let
@@ -722,7 +727,7 @@ class Parser(tokens)
     let { name } = .consume(Id)
     .consume(Eq)
     let expr = .parse_expr()
-    return new NamedLet(name, expr)
+    new NamedLet(name, expr)
   end
 end
 
