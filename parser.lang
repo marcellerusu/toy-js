@@ -225,14 +225,8 @@ class Parser(tokens)
     end
   end
 
-  def is_dot_access 
-    return .scan(Dot) && .prev_token.line === .cur_token.line
-  end
-
-  def is_property_lookup
-    return .scan(OpenSquare) && .prev_token.line === .cur_token.line
-  end
-
+  def is_dot_access = .scan(Dot) && .prev_token.line === .cur_token.line
+  def is_property_lookup = .scan(OpenSquare) && .prev_token.line === .cur_token.line
 
   def parse_expr
     let expr = .first_parse_expr()
@@ -609,8 +603,16 @@ class Parser(tokens)
     let { name } = .consume(Id)
     let args = []
     args = .parse_arg_defs() if .scan(OpenParen)
-    let body = .clone_and_parse_until(End)
-    .consume(End)
+    let body = []
+    if .scan(Eq)
+      .consume(Eq)
+      let expr = .parse_expr()
+      expr = new ReturnExpr(expr) if expr is not ReturnExpr
+      body.push(expr)
+    else
+      body = .clone_and_parse_until(End)
+      .consume(End)
+    end
     return new FunctionDef(name, args, body)
   end
 

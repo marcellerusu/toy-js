@@ -25,7 +25,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
             "  throw new Panic(reason);\n" +
             "}\n"
   js = ""
-  get padding = Array(.indentation).join(" ")
+  get padding = Array(.indentation + 1).join(" ")
 
   def eval
     if .first_run
@@ -173,9 +173,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return "let { " + js_entries + " } = " + .eval_expr(rhs)
   end
 
-  def eval_paren_expr({ expr })
-    return "(" + .eval_expr(expr) + ")"
-  end
+  def eval_paren_expr({ expr }) = "(" + .eval_expr(expr) + ")"
 
   def eval_for_loop({ iter_name, iterable_expr, body })
     let f = "for (let " + iter_name + " of " + .eval_expr(iterable_expr) + ") {\n"
@@ -184,9 +182,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return f
   end
 
-  def eval_is_operator({ lhs, rhs })
-    return .eval_expr(lhs) + " instanceof " + .eval_expr(rhs)
-  end
+  def eval_is_operator({ lhs, rhs }) = .eval_expr(lhs) + " instanceof " + .eval_expr(rhs)
 
   def eval_is_not_operator({ lhs, rhs })
     return "!(" + .eval_expr(lhs) + " instanceof " + .eval_expr(rhs) + ")"
@@ -214,29 +210,16 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     end
   end
 
-  def eval_spread_expr({ expr })
-    return "..." + .eval_expr(expr)
-  end
-
-  def eval_export_default({ expr })
-    return "export default " + .eval_expr(expr)
-  end
-
-  def eval_export_statement({ statement })
-    return "export " + .eval_statement(statement)
-  end
+  def eval_spread_expr({ expr }) = "..." + .eval_expr(expr)
+  def eval_export_default({ expr }) = "export default " + .eval_expr(expr)
+  def eval_export_statement({ statement }) = "export " + .eval_statement(statement)
 
   def eval_property_lookup({ lhs, property })
     return .eval_expr(lhs) + "[" + .eval_expr(property) + "]"
   end
 
-  def eval_continue
-    return "continue"
-  end
-
-  def eval_break
-    return "break"
-  end
+  def eval_continue = "continue"
+  def eval_break = "break"
 
   def eval_while_statement({ test_expr, body })
     let w = "while (" + .eval_expr(test_expr) + ") {\n"
@@ -301,9 +284,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return l
   end
 
-  def eval_prefix_dot_lookup({ name })
-    return "this." + name
-  end
+  def eval_prefix_dot_lookup({ name }) = "this." + name
 
   def eval_obj_class_arg({ entries })
     let entries_js = entries.map(entry => entry.name).join(", ")
@@ -390,21 +371,10 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return c
   end
 
-  def eval_dot_access({ lhs, property })
-    return .eval_expr(lhs) + "." + property
-  end
-
-  def eval_new_expr({ expr })
-    return "new " + .eval_expr(expr)
-  end
-
-  def eval_not_expr({ expr })
-    return "!" + .eval_expr(expr)
-  end
-
-  def eval_empty_data_class_def(name)
-    return "class " + name + " {}"
-  end
+  def eval_dot_access({ lhs, property }) = .eval_expr(lhs) + "." + property
+  def eval_new_expr({ expr }) = "new " + .eval_expr(expr)
+  def eval_not_expr({ expr }) = "!" + .eval_expr(expr)
+  def eval_empty_data_class_def(name) = "class " + name + " {}"
 
   def eval_data_class_def({ name, properties })
     return .eval_empty_data_class_def(name) if !properties
@@ -414,9 +384,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return c
   end
 
-  def eval_js_op_expr({ lhs, type, rhs })
-    return .eval_expr(lhs) + type + .eval_expr(rhs)
-  end
+  def eval_js_op_expr({ lhs, type, rhs }) = .eval_expr(lhs) + type + .eval_expr(rhs)
 
   def eval_command_expr({ name, expr })
     if name === "comptime!"
@@ -430,10 +398,6 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     end
   end
 
-  def eval_id_lookup({ name })
-    return name
-  end
-
   def eval_function_call({ lhs_expr, args })
     let js_args = args.map(.eval_expr.bind(this)).join(", ")
     return .eval_expr(lhs_expr) + "(" + js_args + ")"
@@ -444,21 +408,11 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return value
   end
 
-  def eval_regex_node({ value })
-    return value
-  end
-
-  def eval_str({ value })
-    return "\"" + value + "\""
-  end
-
-  def eval_let({ name, expr })
-    return "let " + name + " = " + .eval_expr(expr)
-  end
-
-  def eval_return_expr({ expr })
-    return "return " + .eval_expr(expr)
-  end
+  def eval_id_lookup({ name }) = name
+  def eval_regex_node({ value }) = value
+  def eval_str({ value }) = "\"" + value + "\""
+  def eval_let({ name, expr }) = "let " + name + " = " + .eval_expr(expr)
+  def eval_return_expr({ expr }) = "return " + .eval_expr(expr)
 
   def eval_function_arg(node)
     if node is SimpleArg

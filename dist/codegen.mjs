@@ -76,7 +76,7 @@ class CodeGen {
     "}\n";
   js = "";
   get padding() {
-    return Array(this.indentation).join(" ");
+    return Array(this.indentation + 1).join(" ");
   }
   eval() {
     if (this.first_run) {
@@ -456,9 +456,6 @@ class CodeGen {
       panic("not known command: " + name);
     }
   }
-  eval_id_lookup({ name }) {
-    return name;
-  }
   eval_function_call({ lhs_expr, args }) {
     let js_args = args.map(this.eval_expr.bind(this)).join(", ");
     return this.eval_expr(lhs_expr) + "(" + js_args + ")";
@@ -468,6 +465,9 @@ class CodeGen {
       return "-" + value;
     }
     return value;
+  }
+  eval_id_lookup({ name }) {
+    return name;
   }
   eval_regex_node({ value }) {
     return value;

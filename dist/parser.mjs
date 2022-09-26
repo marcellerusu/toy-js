@@ -874,8 +874,18 @@ class Parser {
     if (this.scan(OpenParen)) {
       args = this.parse_arg_defs();
     }
-    let body = this.clone_and_parse_until(End);
-    this.consume(End);
+    let body = [];
+    if (this.scan(Eq)) {
+      this.consume(Eq);
+      let expr = this.parse_expr();
+      if (!(expr instanceof ReturnExpr)) {
+        expr = new ReturnExpr(expr);
+      }
+      body.push(expr);
+    } else {
+      body = this.clone_and_parse_until(End);
+      this.consume(End);
+    }
     return new FunctionDef(name, args, body);
   }
   parse_js_op(lhs_expr) {
