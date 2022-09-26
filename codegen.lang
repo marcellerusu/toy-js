@@ -15,6 +15,7 @@ import {
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry
 } from "./parser.mjs"
+
 import vm from "vm"
 let eval_context = vm.createContext()
 
@@ -45,7 +46,6 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     end
     return .js
   end
-
 
   def eval_statement(statement)
     if statement is NamedLet
@@ -258,7 +258,6 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
   end
 
   def eval_body(body, indent_by = 2)
-    # let a = {}
     return new CodeGen(body, {
       indentation: .indentation + indent_by,
       first_run: false
@@ -289,7 +288,6 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return "[" + elements.map(.eval_expr.bind(this)).join(", ") + "]"
   end
 
-  
   def eval_obj_lit({ entries })
     let l = "{ "
     l += entries.map(entry =>
