@@ -8,7 +8,7 @@ A compile-to-js language written in itself
 
 See the youtube series [here](https://www.youtube.com/watch?v=TXEn17hBAFc&list=PLEpvTEuFyPtrD2gYvX277Q8wMpAA3qz7R)
 
-The results are ~1500 lines of toy-js vs the ~2500 lines of javascript, meaning there's been a roughly 40% reduction in code size. This is mostly due to the dataclass syntax.
+The results are ~1500 lines of toy-js vs the ~2000 lines of javascript, meaning there's been a roughly 25% reduction in code size. This is mostly due to the dataclass syntax.
 
 
 # Progress
