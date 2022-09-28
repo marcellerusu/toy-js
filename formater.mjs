@@ -32,9 +32,21 @@ class Formatter {
       return this.format_return_expr(node, is_last);
     } else if (node instanceof NumExpr) {
       return this.format_num_expr(node);
+    } else if (node instanceof NamedLet) {
+      return this.format_named_let(node);
+    } else if (node instanceof JsOpExpr) {
+      return this.format_js_op_expr(node);
+    } else if (node instanceof IdLookup) {
+      return node.name;
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
+  };
+  format_js_op_expr({ lhs, type, rhs }) {
+    return this.format_node(lhs)+" "+type+" "+this.format_node(rhs);
+  };
+  format_named_let({ name, expr }) {
+    return "let "+name+" = "+this.format_node(expr);
   };
   format_num_expr({ value }) {
     return value;
@@ -71,5 +83,6 @@ let [, , file_name] = process.argv;
 let str = fs.readFileSync(file_name).toString();
 let tokens = new Lexer(str).tokenize();
 let ast = new Parser(tokens).parse();
-console.log(new Formatter(ast).format());
+let output = new Formatter(ast).format();
+fs.writeFileSync(file_name, output);
 

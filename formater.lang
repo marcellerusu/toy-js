@@ -40,10 +40,24 @@ class Formatter(ast, { indentation = 0 })
     else if node is ReturnExpr
       return .format_return_expr(node, is_last)
     else if node is NumExpr
-      return .format_num_expr(node)      
+      return .format_num_expr(node)
+    else if node is NamedLet
+      return .format_named_let(node)
+    else if node is JsOpExpr
+      return .format_js_op_expr(node)
+    else if node is IdLookup
+      return node.name
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
+  end
+
+  def format_js_op_expr({ lhs, type, rhs })
+    .format_node(lhs) + " " + type + " " + .format_node(rhs)
+  end
+
+  def format_named_let({ name, expr })
+    "let " + name + " = " + .format_node(expr)
   end
 
   def format_num_expr({ value })
@@ -92,4 +106,6 @@ let str = fs.readFileSync(file_name).toString()
 
 let tokens = new Lexer(str).tokenize()
 let ast = new Parser(tokens).parse()
-console.log(new Formatter(ast).format())
+let output = new Formatter(ast).format()
+# console.log(output)
+fs.writeFileSync(file_name, output)
