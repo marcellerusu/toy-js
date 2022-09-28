@@ -152,6 +152,11 @@ export class PrefixDotLookup {
     this.name = name;
   }
 }
+export class PrefixBindLookup {
+  constructor(name) {
+    this.name = name;
+  }
+}
 export class ArrayLiteral {
   constructor(elements) {
     this.elements = elements;
@@ -479,6 +484,8 @@ class Parser {
       return this.parse_obj_lit();
     } else if (this.scan(Spread)) {
       return this.parse_spread();
+    } else if (this.scan(Bind, Id)) {
+      return this.parse_prefix_bind_lookup();
     } else if (this.scan(Dot, Id)) {
       return this.parse_prefix_dot_lookup();
     }
@@ -698,6 +705,11 @@ class Parser {
     let expr = this.parse_expr();
     return new NotExpr(expr);
   }
+  parse_prefix_bind_lookup() {
+    this.consume(Bind);
+    let { name } = this.consume(Id);
+    return new PrefixBindLookup(name);
+  }
   parse_prefix_dot_lookup() {
     this.consume(Dot);
     let { name } = this.consume(Id);
@@ -884,10 +896,10 @@ class Parser {
       body.push(expr);
     } else {
       body = this.clone_and_parse_until(End);
+      let non_returnable = [ReturnExpr, IfStatement, NamedLet];
       if (
         body.length > 0 &&
-        !(body.at(-1) instanceof ReturnExpr) &&
-        !(body.at(-1) instanceof IfStatement)
+        non_returnable.every((Klass) => !(body.at(-1) instanceof Klass))
       ) {
         body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))];
       }

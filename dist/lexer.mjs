@@ -369,7 +369,7 @@ class Lexer {
         tokens.push(new Num(line, Number(this.matched)));
       } else if (this.scan(/-[0-9]+/)) {
         tokens.push(new Num(line, Number(this.matched), true));
-      } else if (this.scan(/[\+\-\*\/\%\<\>]|>=|<=|&&|\|\||===|!==/)) {
+      } else if (this.scan(/\>=|\<=|[\+\-\*\/\%\<\>]|&&|\|\||===|!==/)) {
         tokens.push(new JsOp(line, this.matched));
       } else if (this.scan(/=>/)) {
         tokens.push(new Arrow(line));

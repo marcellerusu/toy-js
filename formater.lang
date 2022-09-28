@@ -22,6 +22,16 @@ import {
 class Formatter(ast, { indentation = 0 })
   get padding = Array(.indentation + 1).join(" ")
 
+  def space_for(count, max = 5)
+    let space = " "
+    if count > max
+      .indentation += 2
+      space = "\n" + .padding
+      .indentation += -2
+    end
+    return space
+  end
+
   def format
     let output = ""
     let i = 0
@@ -45,11 +55,71 @@ class Formatter(ast, { indentation = 0 })
       return .format_named_let(node)
     else if node is JsOpExpr
       return .format_js_op_expr(node)
+    else if node is StrExpr
+      return "\"" + node.value + "\""
+    else if node is ForLoop
+      return .format_for_loop(node)
     else if node is IdLookup
       return node.name
+    else if node is ArrayLiteral
+      return .format_array_literal(node)
+    else if node is DefaultImport
+      return .format_default_import(node)
+    else if node is ImportStatement
+      return .format_import_statement(node)
+    else if node is PrefixDotLookup
+      return "." + node.name
+    else if node is NodePlusAssignment
+      return .format_node_plus_assignment(node)
+    else if node is FunctionCall
+      return .format_function_call(node)
+    else if node is DotAccess
+      return .format_dot_access(node)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
+  end
+
+  def format_dot_access({ lhs, property })
+    .format_node(lhs) + "." + property
+  end
+
+  def format_function_call({ lhs_expr, args })
+    let space = .space_for(args.length, 2)
+    let end_space = "\n" + .padding
+    end_space = " " if args.length <= 2
+    let args_output = space + args.map(::format_node).join("," + space) 
+    args_output += "," + end_space
+
+    .format_node(lhs_expr) + "(" + args_output + ")"
+  end
+
+  def format_node_plus_assignment({ lhs_expr, rhs_expr })
+    .format_node(lhs_expr) + " += " + .format_node(rhs_expr)
+  end
+
+  def format_for_loop({ iter_name, iterable_expr, body })
+    let f = "for let " + iter_name + " of " + .format_node(iterable_expr) + " do\n"
+    f += .format_body(body)
+    f += .padding + "end"
+    return f
+  end
+
+  def format_import_statement({ imports, path })
+    let space = .space_for(imports.length)
+
+    let i = "import {" + space + imports.join("," + space) + "," + space[0] + "}"
+    i += " from " + "\"" + path + "\""
+    return i
+  end
+
+  def format_default_import({ name, path })
+    "import " + name + " from " + "\"" + path + "\""
+  end
+
+  def format_array_literal({ elements })
+    let space = .space_for(imports.length)
+    return "[" + space + elements.map(::format_node).join("," + space) + "," + space[0] + "]"
   end
 
   def format_js_op_expr({ lhs, type, rhs })
@@ -79,6 +149,7 @@ class Formatter(ast, { indentation = 0 })
     if arg_node is SimpleArg
       return arg_node.name
     else
+      console.log(arg_node)
       assert_not_reached! "Arg format not implemented for " + node.constructor.name
     end
   end
@@ -86,8 +157,7 @@ class Formatter(ast, { indentation = 0 })
   def format_function_def({ name, args, body })
     let f = "def " + name
     if args.length > 0
-      # args.map(::format_node)
-      let args_f = args.map(.format_arg.bind(this)).join(", ")
+      let args_f = args.map(::format_arg).join(", ")
       f += "(" + args_f + ")"
     end
     f += "\n"

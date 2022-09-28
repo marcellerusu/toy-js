@@ -13,7 +13,7 @@ import {
   RegularObjectProperty, RenamedProperty, ImportStatement,
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
-  SimpleDefaultArg, ObjLit, SimpleObjEntry
+  SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup
 } from "./parser.mjs"
 
 import vm from "vm"
@@ -114,6 +114,8 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
       return .eval_dot_access(expr)
     else if expr is PrefixDotLookup
       return .eval_prefix_dot_lookup(expr)
+    else if expr is PrefixBindLookup
+      return .eval_prefix_bind_lookup(expr)
     else if expr is ArrayLiteral
       return .eval_array_literal(expr)
     else if expr is ObjLit
@@ -284,6 +286,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return l
   end
 
+  def eval_prefix_bind_lookup({ name }) = "this." + name + ".bind(this)"
   def eval_prefix_dot_lookup({ name }) = "this." + name
 
   def eval_obj_class_arg({ entries })

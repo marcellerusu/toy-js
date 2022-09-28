@@ -14,6 +14,15 @@ class Formatter {
   get padding() {
     return Array(this.indentation+1).join(" ");
   };
+  space_for(count, max = 5) {
+    let space = " ";
+    if (count>max) {
+      this.indentation += 2;
+      space = "\n"+this.padding;
+      this.indentation += -2;
+    };
+    return space;
+  };
   format() {
     let output = "";
     let i = 0;
@@ -36,11 +45,64 @@ class Formatter {
       return this.format_named_let(node);
     } else if (node instanceof JsOpExpr) {
       return this.format_js_op_expr(node);
+    } else if (node instanceof StrExpr) {
+      return "\""+node.value+"\"";
+    } else if (node instanceof ForLoop) {
+      return this.format_for_loop(node);
     } else if (node instanceof IdLookup) {
       return node.name;
+    } else if (node instanceof ArrayLiteral) {
+      return this.format_array_literal(node);
+    } else if (node instanceof DefaultImport) {
+      return this.format_default_import(node);
+    } else if (node instanceof ImportStatement) {
+      return this.format_import_statement(node);
+    } else if (node instanceof PrefixDotLookup) {
+      return "."+node.name;
+    } else if (node instanceof NodePlusAssignment) {
+      return this.format_node_plus_assignment(node);
+    } else if (node instanceof FunctionCall) {
+      return this.format_function_call(node);
+    } else if (node instanceof DotAccess) {
+      return this.format_dot_access(node);
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
+  };
+  format_dot_access({ lhs, property }) {
+    return this.format_node(lhs)+"."+property;
+  };
+  format_function_call({ lhs_expr, args }) {
+    let space = this.space_for(args.length, 2);
+    let end_space = "\n"+this.padding;
+    if (args.length<=2) {
+      end_space = " ";
+    };
+    let args_output = space+args.map(this.format_node.bind(this)).join(","+space);
+    args_output += ","+end_space;
+    return this.format_node(lhs_expr)+"("+args_output+")";
+  };
+  format_node_plus_assignment({ lhs_expr, rhs_expr }) {
+    return this.format_node(lhs_expr)+" += "+this.format_node(rhs_expr);
+  };
+  format_for_loop({ iter_name, iterable_expr, body }) {
+    let f = "for let "+iter_name+" of "+this.format_node(iterable_expr)+" do\n";
+    f += this.format_body(body);
+    f += this.padding+"end";
+    return f;
+  };
+  format_import_statement({ imports, path }) {
+    let space = this.space_for(imports.length);
+    let i = "import {"+space+imports.join(","+space)+","+space[0]+"}";
+    i += " from "+"\""+path+"\"";
+    return i;
+  };
+  format_default_import({ name, path }) {
+    return "import "+name+" from "+"\""+path+"\"";
+  };
+  format_array_literal({ elements }) {
+    let space = this.space_for(imports.length);
+    return "["+space+elements.map(this.format_node.bind(this)).join(","+space)+","+space[0]+"]";
   };
   format_js_op_expr({ lhs, type, rhs }) {
     return this.format_node(lhs)+" "+type+" "+this.format_node(rhs);
@@ -64,6 +126,7 @@ class Formatter {
     if (arg_node instanceof SimpleArg) {
       return arg_node.name;
     } else {
+      console.log(arg_node);
       panic("Arg format not implemented for "+node.constructor.name);
     };
   };

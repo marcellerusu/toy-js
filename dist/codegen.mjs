@@ -57,6 +57,7 @@ import {
   SimpleDefaultArg,
   ObjLit,
   SimpleObjEntry,
+  PrefixBindLookup,
 } from "./parser.mjs";
 import vm from "vm";
 let eval_context = vm.createContext();
@@ -162,6 +163,8 @@ class CodeGen {
       return this.eval_dot_access(expr);
     } else if (expr instanceof PrefixDotLookup) {
       return this.eval_prefix_dot_lookup(expr);
+    } else if (expr instanceof PrefixBindLookup) {
+      return this.eval_prefix_bind_lookup(expr);
     } else if (expr instanceof ArrayLiteral) {
       return this.eval_array_literal(expr);
     } else if (expr instanceof ObjLit) {
@@ -337,6 +340,9 @@ class CodeGen {
       .join(", ");
     l += " }";
     return l;
+  }
+  eval_prefix_bind_lookup({ name }) {
+    return "this." + name + ".bind(this)";
   }
   eval_prefix_dot_lookup({ name }) {
     return "this." + name;

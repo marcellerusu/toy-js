@@ -27,6 +27,7 @@ export dataclass ClassDef(name, properties, entries)
 export dataclass ClassInstanceEntry(name, expr)
 export dataclass ClassGetterExpr(name, expr)
 export dataclass PrefixDotLookup(name)
+export dataclass PrefixBindLookup(name)
 export dataclass ArrayLiteral(elements)
 export dataclass ObjLit(entries)
 export dataclass SimpleObjEntry(name, expr)
@@ -192,6 +193,8 @@ class Parser(tokens)
       return .parse_obj_lit()
     else if .scan(Spread)
       return .parse_spread()
+    else if .scan(Bind, Id)
+      return .parse_prefix_bind_lookup()
     else if .scan(Dot, Id)
       return .parse_prefix_dot_lookup()
     end
@@ -426,6 +429,12 @@ class Parser(tokens)
     new NotExpr(expr)
   end
 
+  def parse_prefix_bind_lookup
+    .consume(Bind)
+    let { name } = .consume(Id)
+    new PrefixBindLookup(name)
+  end
+
   def parse_prefix_dot_lookup
     .consume(Dot)
     let { name } = .consume(Id)
@@ -611,7 +620,12 @@ class Parser(tokens)
       body.push(expr)
     else
       body = .clone_and_parse_until(End)
-      if body.length > 0 && (body.at(-1) is not ReturnExpr) && body.at(-1) is not IfStatement
+      let non_returnable = [
+        ReturnExpr,
+        IfStatement,
+        NamedLet
+      ]
+      if body.length > 0 && non_returnable.every(Klass => body.at(-1) is not Klass)
         body = [...body.slice(0, -1), new ReturnExpr(body.at(-1))]
       end
       .consume(End)
