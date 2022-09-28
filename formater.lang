@@ -1,0 +1,95 @@
+import Lexer from "./dist/lexer.mjs"
+import Parser from "./dist/parser.mjs"
+import fs from "fs"
+import {
+  IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr,
+  JsOpExpr, FunctionDef, ReturnExpr, DataClassDef,
+  NewExpr, DotAccess, ClassDef, ClassInstanceEntry,
+  ClassGetterExpr, PrefixDotLookup, StrExpr,
+  NotExpr, ArrayLiteral, IfStatement, NodeAssignment,
+  NodePlusAssignment, WhileStatement, RegexNode,
+  ContinueStatement, BreakStatement, IfBranch,
+  ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault,
+  ExportStatement, SpreadExpr, SimpleArg, SpreadArg,
+  ArrowFn, IsOperator, BoundFunctionDef, ForLoop,
+  IsNotOperator, ParenExpr, LetObjectDeconstruction,
+  RegularObjectProperty, RenamedProperty, ImportStatement,
+  DefaultImport, LetArrDeconstruction, ArrNameEntry,
+  ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
+  SimpleDefaultArg, ObjLit, SimpleObjEntry
+} from "./dist/parser.mjs"
+
+class Formatter(ast, { indentation = 0 })
+  get padding = Array(.indentation + 1).join(" ")
+
+  def format
+    let output = ""
+    let i = 0
+    for let node of .ast do
+      output += .padding
+      output += .format_node(node, i === .ast.length - 1)
+      output += "\n"
+      i += 1
+    end
+    return output
+  end
+
+  def format_node(node, is_last = false)
+    if node is FunctionDef
+      return .format_function_def(node)
+    else if node is ReturnExpr
+      return .format_return_expr(node, is_last)
+    else if node is NumExpr
+      return .format_num_expr(node)      
+    else
+      assert_not_reached! "Format not implemented for " + node.constructor.name
+    end
+  end
+
+  def format_num_expr({ value })
+    value
+  end
+
+  def format_return_expr({ expr }, is_last)  
+    return .format_node(expr) if is_last
+    "return " + .format_node(expr)
+  end
+
+  def format_body(body, indent_by = 2)
+    new Formatter(body, {
+      indentation: .indentation + indent_by
+    }).format().trimEnd() + "\n"
+  end
+
+  def format_arg(arg_node)
+    if arg_node is SimpleArg
+      return arg_node.name
+    else
+      assert_not_reached! "Arg format not implemented for " + node.constructor.name
+    end
+  end
+
+  def format_function_def({ name, args, body })
+    let f = "def " + name
+    if args.length > 0
+      # args.map(::format_node)
+      let args_f = args.map(.format_arg.bind(this)).join(", ")
+      f += "(" + args_f + ")"
+    end
+    f += "\n"
+    f += .format_body(body)
+    f += "end"
+
+    return f    
+  end
+end
+
+
+
+let [, , file_name] = process.argv
+
+let str = fs.readFileSync(file_name).toString()
+
+let tokens = new Lexer(str).tokenize()
+let ast = new Parser(tokens).parse()
+console.log(new Formatter(ast).format())
