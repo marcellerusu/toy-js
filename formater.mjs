@@ -5,7 +5,7 @@ function panic(reason) {
 import Lexer from "./dist/lexer.mjs";
 import Parser from "./dist/parser.mjs";
 import fs from "fs";
-import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry } from "./dist/parser.mjs";
+import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry } from "./dist/parser.mjs";
 class Formatter {
   constructor(ast, { indentation } = { indentation: 0 }) {
     this.ast = ast;
@@ -13,6 +13,12 @@ class Formatter {
   }
   get padding() {
     return Array(this.indentation+1).join(" ");
+  };
+  indent() {
+    return this.indentation += 2;
+  };
+  dedent() {
+    return this.indentation += -2;
   };
   space_for(count, max = 5) {
     let space = " ";
@@ -65,21 +71,65 @@ class Formatter {
       return this.format_function_call(node);
     } else if (node instanceof DotAccess) {
       return this.format_dot_access(node);
+    } else if (node instanceof ClassDef) {
+      return this.format_class_def(node);
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
+  };
+  format_class_entry(entry) {
+    if (entry instanceof ClassGetterExpr) {
+      return "get "+entry.name+" = "+this.format_node(entry.expr);
+    } else {
+      panic("class entry: "+entry.constructor.name);
+    };
+  };
+  format_class_obj_arg(node) {
+    if (node instanceof ObjClassArgEntry) {
+      return node.name;
+    } else if (node instanceof DefaultObjClassArg) {
+      return node.name+" = "+this.format_node(node.expr);
+    } else {
+      panic("obj arg: "+node.constructor.name);
+    };
+  };
+  format_class_arg(arg) {
+    if (arg instanceof NamedClassArg) {
+      return arg.name;
+    } else if (arg instanceof ObjClassArg) {
+      return "{ "+arg.entries.map(this.format_class_obj_arg.bind(this)).join(", ")+" }";
+    } else {
+      panic("class arg: "+arg.constructor.name);
+    };
+  };
+  format_class_def({ name, properties, entries }) {
+    let c = "class "+name;
+    if (properties) {
+      c += "("+properties.map(this.format_class_arg.bind(this)).join(", ")+")";
+    };
+    c += "\n";
+    this.indent();
+    c += this.padding+entries.map(this.format_class_entry.bind(this)).join("\n\n"+this.padding);
+    this.dedent();
+    c += "\n";
+    return c += "end";
   };
   format_dot_access({ lhs, property }) {
     return this.format_node(lhs)+"."+property;
   };
   format_function_call({ lhs_expr, args }) {
-    let space = this.space_for(args.length, 2);
-    let end_space = "\n"+this.padding;
-    if (args.length<=2) {
-      end_space = " ";
+    let start = "";
+    let separator = ", ";
+    let ending = "";
+    if (args.length>2) {
+      this.indentation += 2;
+      start = "\n"+this.padding;
+      separator = ",\n"+this.padding;
+      this.indentation += -2;
+      ending = ",\n"+this.padding;
     };
-    let args_output = space+args.map(this.format_node.bind(this)).join(","+space);
-    args_output += ","+end_space;
+    let args_output = start+args.map(this.format_node.bind(this)).join(separator);
+    args_output += ending;
     return this.format_node(lhs_expr)+"("+args_output+")";
   };
   format_node_plus_assignment({ lhs_expr, rhs_expr }) {

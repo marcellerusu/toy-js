@@ -1,11 +1,3 @@
-def format
-  let output = ""
-  let i = 0
-  for let node of .ast do
-    output += .padding
-    output += .format_node( node, i === .ast.length - 1, )
-    output += "\n"
-    i += 1
-  end
-  output
+class Formatter(ast, { indentation = 0 })
+  get padding = Array(.indentation + 1).join(" ")
 end

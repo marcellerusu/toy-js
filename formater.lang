@@ -16,11 +16,13 @@ import {
   RegularObjectProperty, RenamedProperty, ImportStatement,
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
-  SimpleDefaultArg, ObjLit, SimpleObjEntry
+  SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry
 } from "./dist/parser.mjs"
 
 class Formatter(ast, { indentation = 0 })
   get padding = Array(.indentation + 1).join(" ")
+  def indent = .indentation += 2
+  def dedent = .indentation += -2
 
   def space_for(count, max = 5)
     let space = " "
@@ -75,9 +77,52 @@ class Formatter(ast, { indentation = 0 })
       return .format_function_call(node)
     else if node is DotAccess
       return .format_dot_access(node)
+    else if node is ClassDef
+      return .format_class_def(node)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
+  end
+
+  def format_class_entry(entry)
+    if entry is ClassGetterExpr
+      return "get " + entry.name + " = " + .format_node(entry.expr)
+    else
+      assert_not_reached! "class entry: " +  entry.constructor.name
+    end
+  end
+
+  def format_class_obj_arg(node)
+    if node is ObjClassArgEntry
+      return node.name
+    else if node is DefaultObjClassArg
+      return node.name + " = " + .format_node(node.expr)
+    else
+      assert_not_reached! "obj arg: " + node.constructor.name
+    end
+  end
+
+  def format_class_arg(arg)
+    if arg is NamedClassArg
+      return arg.name
+    else if arg is ObjClassArg
+      return "{ " + arg.entries.map(::format_class_obj_arg).join(", ") + " }"
+    else
+      assert_not_reached! "class arg: " + arg.constructor.name
+    end
+  end
+
+  def format_class_def({ name, properties, entries })
+    let c = "class " + name
+    if properties
+      c += "(" + properties.map(::format_class_arg).join(", ") + ")"
+    end
+    c += "\n"
+    .indent()
+    c += .padding + entries.map(::format_class_entry).join("\n\n" + .padding)
+    .dedent()
+    c += "\n"
+    c += "end"
   end
 
   def format_dot_access({ lhs, property })
@@ -85,11 +130,18 @@ class Formatter(ast, { indentation = 0 })
   end
 
   def format_function_call({ lhs_expr, args })
-    let space = .space_for(args.length, 2)
-    let end_space = "\n" + .padding
-    end_space = " " if args.length <= 2
-    let args_output = space + args.map(::format_node).join("," + space) 
-    args_output += "," + end_space
+    let start = ""
+    let separator = ", "
+    let ending = ""
+    if args.length > 2
+      .indentation += 2
+      start = "\n" + .padding
+      separator = ",\n" + .padding
+      .indentation += -2
+      ending = ",\n" + .padding
+    end
+    let args_output = start + args.map(::format_node).join(separator) 
+    args_output += ending
 
     .format_node(lhs_expr) + "(" + args_output + ")"
   end

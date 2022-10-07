@@ -66,8 +66,6 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
       return .eval_if_statement(statement)
     else if statement is NodeAssignment
       return .eval_node_assignment(statement)
-    else if statement is NodePlusAssignment
-      return .eval_node_plus_assignment(statement)
     else if statement is WhileStatement
       return .eval_while_statement(statement)
     else if statement is ContinueStatement
@@ -132,6 +130,8 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
       return .eval_is_not_operator(expr)
     else if expr is ParenExpr
       return .eval_paren_expr(expr)
+    else if expr is NodePlusAssignment
+      return .eval_node_plus_assignment(expr)
     else
       console.log(expr)
       assert_not_reached! "no expr"

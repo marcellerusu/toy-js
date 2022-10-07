@@ -116,8 +116,6 @@ class CodeGen {
       return this.eval_if_statement(statement);
     } else if (statement instanceof NodeAssignment) {
       return this.eval_node_assignment(statement);
-    } else if (statement instanceof NodePlusAssignment) {
-      return this.eval_node_plus_assignment(statement);
     } else if (statement instanceof WhileStatement) {
       return this.eval_while_statement(statement);
     } else if (statement instanceof ContinueStatement) {
@@ -181,6 +179,8 @@ class CodeGen {
       return this.eval_is_not_operator(expr);
     } else if (expr instanceof ParenExpr) {
       return this.eval_paren_expr(expr);
+    } else if (expr instanceof NodePlusAssignment) {
+      return this.eval_node_plus_assignment(expr);
     } else {
       console.log(expr);
       panic("no expr");
