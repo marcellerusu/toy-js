@@ -26,4 +26,46 @@ class Formatter(ast, { indentation = 0 })
     end
     output
   end
+
+  def format_node(node, is_last = false)
+    if node is FunctionDef
+      return .format_function_def(node)
+    else if node is ReturnExpr
+      return .format_return_expr(node, is_last)
+    else if node is NumExpr
+      return .format_num_expr(node)
+    else if node is NamedLet
+      return .format_named_let(node)
+    else if node is JsOpExpr
+      return .format_js_op_expr(node)
+    else if node is StrExpr
+      return "\"" + node.value + "\""
+    else if node is ForLoop
+      return .format_for_loop(node)
+    else if node is IdLookup
+      return node.name
+    else if node is ArrayLiteral
+      return .format_array_literal(node)
+    else if node is DefaultImport
+      return .format_default_import(node)
+    else if node is ImportStatement
+      return .format_import_statement(node)
+    else if node is PrefixDotLookup
+      return "." + node.name
+    else if node is NodePlusAssignment
+      return .format_node_plus_assignment(node)
+    else if node is FunctionCall
+      return .format_function_call(node)
+    else if node is DotAccess
+      return .format_dot_access(node)
+    else if node is ClassDef
+      return .format_class_def(node)
+    else if node is IfStatement
+      return .format_if_statement(node)
+    else if node is NodeAssignment
+      return .format_node_assignment(node)
+    else
+      assert_not_reached! "Format not implemented for " + node.constructor.name
+    end
+  end
 end

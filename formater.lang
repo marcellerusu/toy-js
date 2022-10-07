@@ -19,7 +19,7 @@ import {
   SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry
 } from "./dist/parser.mjs"
 
-class Formatter(ast, { indentation = 0 })
+class Formatter(ast, { indentation = 0, parents = [] })
   get padding = Array(.indentation + 1).join(" ")
   def indent = .indentation += 2
   def dedent = .indentation += -2
@@ -46,11 +46,15 @@ class Formatter(ast, { indentation = 0 })
     return output
   end
 
+  get is_in_if = .parents.at(-1) === IfBranch
+    || .parents.at(-1) === ElseIfBranch
+    || .parents.at(-1) === ElseBranch
+
   def format_node(node, is_last = false)
     if node is FunctionDef
       return .format_function_def(node)
     else if node is ReturnExpr
-      return .format_return_expr(node, is_last)
+      return .format_return_expr(node, is_last && !.is_in_if)
     else if node is NumExpr
       return .format_num_expr(node)
     else if node is NamedLet
@@ -83,28 +87,53 @@ class Formatter(ast, { indentation = 0 })
       return .format_if_statement(node)
     else if node is NodeAssignment
       return .format_node_assignment(node)
+    else if node is IsOperator
+      return .format_is_operator(node)
+    else if node is CommandExpr
+      return .format_command_expr(node)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
   end
 
+  def format_command_expr({ name, expr })
+    name + " " + .format_node(expr)
+  end
+
+  def format_is_operator({ lhs, rhs })
+    .format_node(lhs) + " is " + .format_node(rhs)
+  end
+
   def format_if_branch({ test_expr, body })  
     let i = "if " + .format_node(test_expr) + "\n"
-    i += .format_body(body)
-    i += .padding + "end"
+    i += .format_body(body, IfBranch)
     i
+  end
+
+  def format_else_if_branch({ test_expr, body })
+    let i = "else if " + .format_node(test_expr) + "\n"
+    i += .format_body(body, ElseIfBranch)
+    i
+  end
+
+  def format_else_branch({ body })  
+    "else\n" + .format_body(body, ElseBranch)
   end
 
   def format_branch(branch)
     if branch is IfBranch
       return .format_if_branch(branch)
+    else if branch is ElseIfBranch
+      return .format_else_if_branch(branch)
+    else if branch is ElseBranch
+      return .format_else_branch(branch)
     else
       assert_not_reached! "not implemented if branch"
     end
   end  
 
   def format_if_statement({ branches })
-    branches.map(::format_branch).join("\n")
+    branches.map(::format_branch).join(.padding) + .padding + "end"
   end
 
   def format_class_entry(entry)
@@ -181,7 +210,7 @@ class Formatter(ast, { indentation = 0 })
 
   def format_for_loop({ iter_name, iterable_expr, body })
     let f = "for let " + iter_name + " of " + .format_node(iterable_expr) + " do\n"
-    f += .format_body(body)
+    f += .format_body(body, ForLoop)
     f += .padding + "end"
     return f
   end
@@ -220,9 +249,10 @@ class Formatter(ast, { indentation = 0 })
     "return " + .format_node(expr)
   end
 
-  def format_body(body, indent_by = 2)
+  def format_body(body, parent, indent_by = 2)
     new Formatter(body, {
-      indentation: .indentation + indent_by
+      indentation: .indentation + indent_by,
+      parents: .parents.concat(parent)
     }).format().trimEnd() + "\n"
   end
 
@@ -238,14 +268,14 @@ class Formatter(ast, { indentation = 0 })
   end
 
   def format_function_def({ name, args, body })
-    if body.length > 1
+    if body.length > 1 || body[0] is IfStatement
       let f = "def " + name
       if args.length > 0
         let args_f = args.map(::format_arg).join(", ")
         f += "(" + args_f + ")"
       end
       f += "\n"
-      f += .format_body(body)
+      f += .format_body(body, FunctionDef)
       f += .padding + "end"
 
       return f

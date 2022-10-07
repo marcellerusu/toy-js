@@ -7,9 +7,10 @@ import Parser from "./dist/parser.mjs";
 import fs from "fs";
 import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry } from "./dist/parser.mjs";
 class Formatter {
-  constructor(ast, { indentation } = { indentation: 0 }) {
+  constructor(ast, { indentation, parents } = { indentation: 0, parents: [] }) {
     this.ast = ast;
     this.indentation = indentation;
+    this.parents = parents;
   }
   get padding() {
     return Array(this.indentation+1).join(" ");
@@ -40,11 +41,14 @@ class Formatter {
     };
     return output;
   };
+  get is_in_if() {
+    return this.parents.at(-1)===IfBranch||this.parents.at(-1)===ElseIfBranch||this.parents.at(-1)===ElseBranch;
+  };
   format_node(node, is_last = false) {
     if (node instanceof FunctionDef) {
       return this.format_function_def(node);
     } else if (node instanceof ReturnExpr) {
-      return this.format_return_expr(node, is_last);
+      return this.format_return_expr(node, is_last&&!this.is_in_if);
     } else if (node instanceof NumExpr) {
       return this.format_num_expr(node);
     } else if (node instanceof NamedLet) {
@@ -77,25 +81,46 @@ class Formatter {
       return this.format_if_statement(node);
     } else if (node instanceof NodeAssignment) {
       return this.format_node_assignment(node);
+    } else if (node instanceof IsOperator) {
+      return this.format_is_operator(node);
+    } else if (node instanceof CommandExpr) {
+      return this.format_command_expr(node);
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
   };
+  format_command_expr({ name, expr }) {
+    return name+" "+this.format_node(expr);
+  };
+  format_is_operator({ lhs, rhs }) {
+    return this.format_node(lhs)+" is "+this.format_node(rhs);
+  };
   format_if_branch({ test_expr, body }) {
     let i = "if "+this.format_node(test_expr)+"\n";
-    i += this.format_body(body);
-    i += this.padding+"end";
+    i += this.format_body(body, IfBranch);
     return i;
+  };
+  format_else_if_branch({ test_expr, body }) {
+    let i = "else if "+this.format_node(test_expr)+"\n";
+    i += this.format_body(body, ElseIfBranch);
+    return i;
+  };
+  format_else_branch({ body }) {
+    return "else\n"+this.format_body(body, ElseBranch);
   };
   format_branch(branch) {
     if (branch instanceof IfBranch) {
       return this.format_if_branch(branch);
+    } else if (branch instanceof ElseIfBranch) {
+      return this.format_else_if_branch(branch);
+    } else if (branch instanceof ElseBranch) {
+      return this.format_else_branch(branch);
     } else {
       panic("not implemented if branch");
     };
   };
   format_if_statement({ branches }) {
-    return branches.map(this.format_branch.bind(this)).join("\n");
+    return branches.map(this.format_branch.bind(this)).join(this.padding)+this.padding+"end";
   };
   format_class_entry(entry) {
     if (entry instanceof ClassGetterExpr) {
@@ -162,7 +187,7 @@ class Formatter {
   };
   format_for_loop({ iter_name, iterable_expr, body }) {
     let f = "for let "+iter_name+" of "+this.format_node(iterable_expr)+" do\n";
-    f += this.format_body(body);
+    f += this.format_body(body, ForLoop);
     f += this.padding+"end";
     return f;
   };
@@ -194,8 +219,8 @@ class Formatter {
     };
     return "return "+this.format_node(expr);
   };
-  format_body(body, indent_by = 2) {
-    return new Formatter(body, { indentation: this.indentation+indent_by }).format().trimEnd()+"\n";
+  format_body(body, parent, indent_by = 2) {
+    return new Formatter(body, { indentation: this.indentation+indent_by, parents: this.parents.concat(parent) }).format().trimEnd()+"\n";
   };
   format_arg(arg_node) {
     if (arg_node instanceof SimpleArg) {
@@ -208,14 +233,14 @@ class Formatter {
     };
   };
   format_function_def({ name, args, body }) {
-    if (body.length>1) {
+    if (body.length>1||body[0] instanceof IfStatement) {
       let f = "def "+name;
       if (args.length>0) {
         let args_f = args.map(this.format_arg.bind(this)).join(", ");
         f += "("+args_f+")";
       };
       f += "\n";
-      f += this.format_body(body);
+      f += this.format_body(body, FunctionDef);
       f += this.padding+"end";
       return f;
     } else {
