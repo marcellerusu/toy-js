@@ -1,3 +1,29 @@
 class Formatter(ast, { indentation = 0 })
   get padding = Array(.indentation + 1).join(" ")
+
+  def indent = .indentation += 2
+
+  def dedent = .indentation += -2
+
+  def space_for(count, max = 5)
+    let space = " "
+    if count > max
+      .indentation += 2
+      space = "\n" + .padding
+      .indentation += -2
+    end
+    space
+  end
+
+  def format
+    let output = ""
+    let i = 0
+    for let node of .ast do
+      output += .padding
+      output += .format_node(node, i === .ast.length - 1)
+      output += "\n"
+      i += 1
+    end
+    output
+  end
 end

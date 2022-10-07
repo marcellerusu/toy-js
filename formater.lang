@@ -79,14 +79,39 @@ class Formatter(ast, { indentation = 0 })
       return .format_dot_access(node)
     else if node is ClassDef
       return .format_class_def(node)
+    else if node is IfStatement
+      return .format_if_statement(node)
+    else if node is NodeAssignment
+      return .format_node_assignment(node)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
   end
 
+  def format_if_branch({ test_expr, body })  
+    let i = "if " + .format_node(test_expr) + "\n"
+    i += .format_body(body)
+    i += .padding + "end"
+    i
+  end
+
+  def format_branch(branch)
+    if branch is IfBranch
+      return .format_if_branch(branch)
+    else
+      assert_not_reached! "not implemented if branch"
+    end
+  end  
+
+  def format_if_statement({ branches })
+    branches.map(::format_branch).join("\n")
+  end
+
   def format_class_entry(entry)
     if entry is ClassGetterExpr
       return "get " + entry.name + " = " + .format_node(entry.expr)
+    else if entry is FunctionDef
+      return .format_function_def(entry)
     else
       assert_not_reached! "class entry: " +  entry.constructor.name
     end
@@ -146,6 +171,10 @@ class Formatter(ast, { indentation = 0 })
     .format_node(lhs_expr) + "(" + args_output + ")"
   end
 
+  def format_node_assignment({ lhs_expr, rhs_expr })
+    .format_node(lhs_expr) + " = " + .format_node(rhs_expr)
+  end
+
   def format_node_plus_assignment({ lhs_expr, rhs_expr })
     .format_node(lhs_expr) + " += " + .format_node(rhs_expr)
   end
@@ -200,6 +229,8 @@ class Formatter(ast, { indentation = 0 })
   def format_arg(arg_node)
     if arg_node is SimpleArg
       return arg_node.name
+    else if arg_node is SimpleDefaultArg
+      return arg_node.name + " = " + .format_node(arg_node.expr)
     else
       console.log(arg_node)
       assert_not_reached! "Arg format not implemented for " + node.constructor.name
@@ -207,16 +238,20 @@ class Formatter(ast, { indentation = 0 })
   end
 
   def format_function_def({ name, args, body })
-    let f = "def " + name
-    if args.length > 0
-      let args_f = args.map(::format_arg).join(", ")
-      f += "(" + args_f + ")"
-    end
-    f += "\n"
-    f += .format_body(body)
-    f += "end"
+    if body.length > 1
+      let f = "def " + name
+      if args.length > 0
+        let args_f = args.map(::format_arg).join(", ")
+        f += "(" + args_f + ")"
+      end
+      f += "\n"
+      f += .format_body(body)
+      f += .padding + "end"
 
-    return f    
+      return f
+    else
+      return "def " + name + " = " + .format_node(body[0], true)
+    end
   end
 end
 

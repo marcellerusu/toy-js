@@ -73,13 +73,35 @@ class Formatter {
       return this.format_dot_access(node);
     } else if (node instanceof ClassDef) {
       return this.format_class_def(node);
+    } else if (node instanceof IfStatement) {
+      return this.format_if_statement(node);
+    } else if (node instanceof NodeAssignment) {
+      return this.format_node_assignment(node);
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
   };
+  format_if_branch({ test_expr, body }) {
+    let i = "if "+this.format_node(test_expr)+"\n";
+    i += this.format_body(body);
+    i += this.padding+"end";
+    return i;
+  };
+  format_branch(branch) {
+    if (branch instanceof IfBranch) {
+      return this.format_if_branch(branch);
+    } else {
+      panic("not implemented if branch");
+    };
+  };
+  format_if_statement({ branches }) {
+    return branches.map(this.format_branch.bind(this)).join("\n");
+  };
   format_class_entry(entry) {
     if (entry instanceof ClassGetterExpr) {
       return "get "+entry.name+" = "+this.format_node(entry.expr);
+    } else if (entry instanceof FunctionDef) {
+      return this.format_function_def(entry);
     } else {
       panic("class entry: "+entry.constructor.name);
     };
@@ -132,6 +154,9 @@ class Formatter {
     args_output += ending;
     return this.format_node(lhs_expr)+"("+args_output+")";
   };
+  format_node_assignment({ lhs_expr, rhs_expr }) {
+    return this.format_node(lhs_expr)+" = "+this.format_node(rhs_expr);
+  };
   format_node_plus_assignment({ lhs_expr, rhs_expr }) {
     return this.format_node(lhs_expr)+" += "+this.format_node(rhs_expr);
   };
@@ -175,21 +200,27 @@ class Formatter {
   format_arg(arg_node) {
     if (arg_node instanceof SimpleArg) {
       return arg_node.name;
+    } else if (arg_node instanceof SimpleDefaultArg) {
+      return arg_node.name+" = "+this.format_node(arg_node.expr);
     } else {
       console.log(arg_node);
       panic("Arg format not implemented for "+node.constructor.name);
     };
   };
   format_function_def({ name, args, body }) {
-    let f = "def "+name;
-    if (args.length>0) {
-      let args_f = args.map(this.format_arg.bind(this)).join(", ");
-      f += "("+args_f+")";
+    if (body.length>1) {
+      let f = "def "+name;
+      if (args.length>0) {
+        let args_f = args.map(this.format_arg.bind(this)).join(", ");
+        f += "("+args_f+")";
+      };
+      f += "\n";
+      f += this.format_body(body);
+      f += this.padding+"end";
+      return f;
+    } else {
+      return "def "+name+" = "+this.format_node(body[0], true);
     };
-    f += "\n";
-    f += this.format_body(body);
-    f += "end";
-    return f;
   };
 };
 let [, , file_name] = process.argv;
