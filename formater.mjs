@@ -2,10 +2,17 @@ class Panic extends Error {}
 function panic(reason) {
   throw new Panic(reason);
 }
+Array.prototype.sum = function() {
+  let sum = 0;
+  for (let item of this) {
+    sum += item;
+  }
+  return sum;
+}
 import Lexer from "./dist/lexer.mjs";
 import Parser from "./dist/parser.mjs";
 import fs from "fs";
-import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry } from "./dist/parser.mjs";
+import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, PrefixBindLookup, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry } from "./dist/parser.mjs";
 class Formatter {
   constructor(ast, { indentation, parents } = { indentation: 0, parents: [] }) {
     this.ast = ast;
@@ -85,9 +92,46 @@ class Formatter {
       return this.format_is_operator(node);
     } else if (node instanceof CommandExpr) {
       return this.format_command_expr(node);
+    } else if (node instanceof PrefixBindLookup) {
+      return this.format_prefix_bind_lookup(node);
+    } else if (node instanceof PropertyLookup) {
+      return this.format_property_lookup(node);
+    } else if (node instanceof NewExpr) {
+      return this.format_new_expr(node);
+    } else if (node instanceof ObjLit) {
+      return this.format_obj_lit(node);
+    } else if (node instanceof NotExpr) {
+      return "!"+this.format_node(node.expr);
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
+  };
+  format_obj_lit_entry(entry) {
+    if (entry instanceof SimpleObjEntry) {
+      return entry.name+": "+this.format_node(entry.expr);
+    } else {
+      panic("Object literal entry not found "+entry.constructor.name);
+    };
+  };
+  format_obj_lit({ entries }) {
+    let entries_js = entries.map(this.format_obj_lit_entry.bind(this));
+    if (entries_js.map((x) => x.length).sum()>35) {
+      this.indent();
+      let obj_lit = "{\n"+this.padding+entries.map(this.format_obj_lit_entry.bind(this)).join(",\n"+this.padding)+",\n";
+      this.dedent();
+      return obj_lit+this.padding+"}";
+    } else {
+      return "{ "+entries_js.join(", ")+" }";
+    };
+  };
+  format_new_expr({ expr }) {
+    return "new "+this.format_node(expr);
+  };
+  format_property_lookup({ lhs, property }) {
+    return this.format_node(lhs)+"["+this.format_node(property)+"]";
+  };
+  format_prefix_bind_lookup({ name }) {
+    return "::"+name;
   };
   format_command_expr({ name, expr }) {
     return name+" "+this.format_node(expr);
@@ -119,8 +163,19 @@ class Formatter {
       panic("not implemented if branch");
     };
   };
+  is_one_line_return(body) {
+    return body.length===1&&body[0] instanceof ReturnExpr;
+  };
+  is_early_return(branches) {
+    return branches.length===1&&branches[0] instanceof IfBranch&&this.is_one_line_return(branches[0].body);
+  };
   format_if_statement({ branches }) {
-    return branches.map(this.format_branch.bind(this)).join(this.padding)+this.padding+"end";
+    if (this.is_early_return(branches)) {
+      let { test_expr,body } = branches[0];
+      return this.format_node(body[0])+" if "+this.format_node(test_expr);
+    } else {
+      return branches.map(this.format_branch.bind(this)).join(this.padding)+this.padding+"end";
+    };
   };
   format_class_entry(entry) {
     if (entry instanceof ClassGetterExpr) {
@@ -227,13 +282,22 @@ class Formatter {
       return arg_node.name;
     } else if (arg_node instanceof SimpleDefaultArg) {
       return arg_node.name+" = "+this.format_node(arg_node.expr);
+    } else if (arg_node instanceof ObjClassArg) {
+      return this.format_class_arg(arg_node);
     } else {
       console.log(arg_node);
       panic("Arg format not implemented for "+node.constructor.name);
     };
   };
+  too_long_for_one_liner(expr) {
+    if (!expr) {
+      return false;
+    };
+    let str = this.format_node(expr);
+    return str.includes("\n")||str.length>50;
+  };
   format_function_def({ name, args, body }) {
-    if (body.length>1||body[0] instanceof IfStatement) {
+    if (body.length>1||body[0] instanceof IfStatement||this.too_long_for_one_liner(body[0])) {
       let f = "def "+name;
       if (args.length>0) {
         let args_f = args.map(this.format_arg.bind(this)).join(", ");
@@ -244,7 +308,7 @@ class Formatter {
       f += this.padding+"end";
       return f;
     } else {
-      return "def "+name+" = "+this.format_node(body[0], true);
+      return "def "+name+"("+args.map(this.format_arg.bind(this)).join(", ")+") = "+this.format_node(body[0], true);
     };
   };
 };

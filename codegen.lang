@@ -23,6 +23,13 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
   prelude = "class Panic extends Error {}\n" +
             "function panic(reason) {\n" +
             "  throw new Panic(reason);\n" +
+            "}\n" + 
+            "Array.prototype.sum = function() {\n" +
+            "  let sum = 0;\n" + 
+            "  for (let item of this) {\n" + 
+            "    sum += item;\n" + 
+            "  }\n" + 
+            "  return sum;\n" + 
             "}\n"
   js = ""
   get padding = Array(.indentation + 1).join(" ")

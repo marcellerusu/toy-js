@@ -8,7 +8,7 @@ import {
   ClassGetterExpr, PrefixDotLookup, StrExpr,
   NotExpr, ArrayLiteral, IfStatement, NodeAssignment,
   NodePlusAssignment, WhileStatement, RegexNode,
-  ContinueStatement, BreakStatement, IfBranch,
+  ContinueStatement, BreakStatement, IfBranch, PrefixBindLookup,
   ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault,
   ExportStatement, SpreadExpr, SimpleArg, SpreadArg,
   ArrowFn, IsOperator, BoundFunctionDef, ForLoop,
@@ -91,9 +91,49 @@ class Formatter(ast, { indentation = 0, parents = [] })
       return .format_is_operator(node)
     else if node is CommandExpr
       return .format_command_expr(node)
+    else if node is PrefixBindLookup
+      return .format_prefix_bind_lookup(node)
+    else if node is PropertyLookup
+      return .format_property_lookup(node)
+    else if node is NewExpr
+      return .format_new_expr(node)
+    else if node is ObjLit
+      return .format_obj_lit(node)
+    else if node is NotExpr
+      return "!" + .format_node(node.expr)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
+  end
+
+  def format_obj_lit_entry(entry)
+    if entry is SimpleObjEntry
+      return entry.name + ": " + .format_node(entry.expr)
+    else
+      assert_not_reached! "Object literal entry not found " + entry.constructor.name
+    end
+  end
+
+  def format_obj_lit({ entries })
+    let entries_js = entries.map(::format_obj_lit_entry)
+    if entries_js.map(x => x.length).sum() > 35
+      .indent()
+      let obj_lit = "{\n" + .padding + entries.map(::format_obj_lit_entry).join(",\n" + .padding) + ",\n"
+      .dedent()
+      return obj_lit + .padding + "}"
+    else 
+      return "{ " + entries_js.join(", ") + " }"
+    end
+  end
+
+  def format_new_expr({ expr }) = "new " + .format_node(expr)
+
+  def format_property_lookup({ lhs, property })
+    .format_node(lhs) + "[" + .format_node(property) + "]"
+  end
+
+  def format_prefix_bind_lookup({ name })
+    "::" + name
   end
 
   def format_command_expr({ name, expr })
@@ -130,10 +170,18 @@ class Formatter(ast, { indentation = 0, parents = [] })
     else
       assert_not_reached! "not implemented if branch"
     end
-  end  
+  end
+
+  def is_one_line_return(body) = body.length === 1 && body[0] is ReturnExpr
+  def is_early_return(branches) = branches.length === 1 && branches[0] is IfBranch && .is_one_line_return(branches[0].body)
 
   def format_if_statement({ branches })
-    branches.map(::format_branch).join(.padding) + .padding + "end"
+    if .is_early_return(branches)
+      let { test_expr, body } = branches[0]
+      return .format_node(body[0]) + " if " + .format_node(test_expr)
+    else
+      return branches.map(::format_branch).join(.padding) + .padding + "end"
+    end
   end
 
   def format_class_entry(entry)
@@ -261,14 +309,22 @@ class Formatter(ast, { indentation = 0, parents = [] })
       return arg_node.name
     else if arg_node is SimpleDefaultArg
       return arg_node.name + " = " + .format_node(arg_node.expr)
+    else if arg_node is ObjClassArg
+      return .format_class_arg(arg_node)
     else
       console.log(arg_node)
       assert_not_reached! "Arg format not implemented for " + node.constructor.name
     end
   end
 
+  def too_long_for_one_liner(expr)
+    return false if !expr
+    let str = .format_node(expr)
+    str.includes("\n") || str.length > 50
+  end
+
   def format_function_def({ name, args, body })
-    if body.length > 1 || body[0] is IfStatement
+    if body.length > 1 || body[0] is IfStatement || .too_long_for_one_liner(body[0])
       let f = "def " + name
       if args.length > 0
         let args_f = args.map(::format_arg).join(", ")
@@ -280,7 +336,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
 
       return f
     else
-      return "def " + name + " = " + .format_node(body[0], true)
+      return "def " + name + "(" + args.map(::format_arg).join(", ") + ") = " + .format_node(body[0], true)
     end
   end
 end
