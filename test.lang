@@ -28,6 +28,7 @@ import {
   ContinueStatement,
   BreakStatement,
   IfBranch,
+  PrefixBindLookup,
   ElseIfBranch,
   ElseBranch,
   PropertyLookup,
@@ -58,7 +59,7 @@ import {
   SimpleObjEntry,
   ObjClassArgEntry,
 } from "./dist/parser.mjs"
-class Formatter(ast, { indentation = 0 })
+class Formatter(ast, { indentation = 0, parents = [] })
   get padding = Array(.indentation + 1).join(" ")
 
   def indent() = .indentation += 2
@@ -93,7 +94,7 @@ class Formatter(ast, { indentation = 0 })
     if node is FunctionDef
       return .format_function_def(node)
     else if node is ReturnExpr
-      return .format_return_expr(node, is_last)
+      return .format_return_expr(node, is_last && !.is_in_if)
     else if node is NumExpr
       return .format_num_expr(node)
     else if node is NamedLet
@@ -126,10 +127,68 @@ class Formatter(ast, { indentation = 0 })
       return .format_if_statement(node)
     else if node is NodeAssignment
       return .format_node_assignment(node)
+    else if node is IsOperator
+      return .format_is_operator(node)
+    else if node is CommandExpr
+      return .format_command_expr(node)
+    else if node is PrefixBindLookup
+      return .format_prefix_bind_lookup(node)
+    else if node is PropertyLookup
+      return .format_property_lookup(node)
+    else if node is NewExpr
+      return .format_new_expr(node)
+    else if node is ObjLit
+      return .format_obj_lit(node)
+    else if node is NotExpr
+      return "!" + .format_node(node.expr)
+    else if node is LetArrDeconstruction
+      return .format_let_arr_deconstruction(node)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
   end
+
+  def format_let_arr_entry(entry)
+    if entry is ArrComma
+      return ""
+    else if entry is ArrNameEntry
+      return entry.name
+    else
+      assert_not_reached! "Let arr unknown " + entry.constructor.name
+    end
+  end
+
+  def format_let_arr_deconstruction({ entries, rhs })
+    "let [" + entries.map(::format_let_arr_entry).join(", ") + "] = " + .format_node(rhs)
+  end
+
+  def format_obj_lit_entry(entry)
+    if entry is SimpleObjEntry
+      return entry.name + ": " + .format_node(entry.expr)
+    else
+      assert_not_reached! "Object literal entry not found " + entry.constructor.name
+    end
+  end
+
+  def format_obj_lit({ entries })
+    let entries_js = entries.map(::format_obj_lit_entry)
+    if entries_js.map(x => x.length).sum() > 35
+      .indent()
+      let obj_lit = "{\n" + .padding + entries.map(::format_obj_lit_entry).join(",\n" + .padding) + ",\n"
+      .dedent()
+      return obj_lit + .padding + "}"
+    else
+      return "{ " + entries_js.join(", ") + " }"
+    end
+  end
+
+  def format_new_expr({ expr }) = "new " + .format_node(expr)
+
+  def format_property_lookup({ lhs, property })
+    .format_node(lhs) + "[" + .format_node(property) + "]"
+  end
+
+  def format_prefix_bind_lookup({ name }) = "::" + name
 
   def format_command_expr({ name, expr }) = name + " " + .format_node(expr)
 
@@ -163,8 +222,19 @@ class Formatter(ast, { indentation = 0 })
     end
   end
 
+  def is_one_line_return(body) = body.length === 1 && body[0] is ReturnExpr
+
+  def is_early_return(branches)
+    branches.length === 1 && branches[0] is IfBranch && .is_one_line_return(branches[0].body)
+  end
+
   def format_if_statement({ branches })
-    branches.map(::format_branch).join(.padding) + .padding + "end"
+    if .is_early_return(branches)
+      let { test_expr, body } = branches[0]
+      return .format_node(body[0]) + " if " + .format_node(test_expr)
+    else
+      return branches.map(::format_branch).join(.padding) + .padding + "end"
+    end
   end
 
   def format_class_entry(entry)
@@ -178,7 +248,6 @@ class Formatter(ast, { indentation = 0 })
   end
 
   def format_class_obj_arg(node)
-    let a = { node: node, other: node, wtf: 100000 }
     if node is ObjClassArgEntry
       return node.name
     else if node is DefaultObjClassArg
@@ -256,7 +325,8 @@ class Formatter(ast, { indentation = 0 })
   end
 
   def format_array_literal({ elements })
-    let space = .space_for(imports.length)
+    return "[]" if elements.length === 1
+    let space = .space_for(elements.length)
     "[" + space + elements.map(::format_node).join("," + space) + "," + space[0] + "]"
   end
 
@@ -298,4 +368,26 @@ class Formatter(ast, { indentation = 0 })
     let str = .format_node(expr)
     str.includes("\n") || str.length > 50
   end
+
+  def format_function_def({ name, args, body })
+    if body.length > 1 || body[0] is IfStatement || .too_long_for_one_liner(body[0])
+      let f = "def " + name
+      if args.length > 0
+        let args_f = args.map(::format_arg).join(", ")
+        f += "(" + args_f + ")"
+      end
+      f += "\n"
+      f += .format_body(body, FunctionDef)
+      f += .padding + "end"
+      return f
+    else
+      return "def " + name + "(" + args.map(::format_arg).join(", ") + ") = " + .format_node(body[0], true)
+    end
+  end
 end
+let [, , file_name] = process.argv
+let str = fs.readFileSync(file_name).toString()
+let tokens = new Lexer(str).tokenize()
+let ast = new Parser(tokens).parse()
+let output = new Formatter(ast).format()
+fs.writeFileSync(file_name, output)

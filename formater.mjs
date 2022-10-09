@@ -102,9 +102,42 @@ class Formatter {
       return this.format_obj_lit(node);
     } else if (node instanceof NotExpr) {
       return "!"+this.format_node(node.expr);
+    } else if (node instanceof ArrowFn) {
+      return this.format_arrow_fn(node);
+    } else if (node instanceof LetArrDeconstruction) {
+      return this.format_let_arr_deconstruction(node);
+    } else if (node instanceof LetObjectDeconstruction) {
+      return this.format_let_object_deconstruction(node);
     } else {
       panic("Format not implemented for "+node.constructor.name);
     };
+  };
+  format_arrow_fn({ arg_name, return_expr }) {
+    return arg_name+" => "+this.format_node(return_expr);
+  };
+  format_let_arr_entry(entry) {
+    if (entry instanceof ArrComma) {
+      return "";
+    } else if (entry instanceof ArrNameEntry) {
+      return entry.name;
+    } else {
+      panic("Let arr unknown "+entry.constructor.name);
+    };
+  };
+  format_let_arr_deconstruction({ entries, rhs }) {
+    return "let ["+entries.map(this.format_let_arr_entry.bind(this)).join(", ")+"] = "+this.format_node(rhs);
+  };
+  format_let_object_entry(entry) {
+    if (entry instanceof RegularObjectProperty) {
+      return entry.name;
+    } else if (entry instanceof RenamedProperty) {
+      return entry.old_name+": "+entry.new_name;
+    } else {
+      panic("Let arr unknown "+entry.constructor.name);
+    };
+  };
+  format_let_object_deconstruction({ entries, rhs }) {
+    return "let { "+entries.map(this.format_let_object_entry.bind(this)).join(", ")+" } = "+this.format_node(rhs);
   };
   format_obj_lit_entry(entry) {
     if (entry instanceof SimpleObjEntry) {
@@ -256,7 +289,10 @@ class Formatter {
     return "import "+name+" from "+"\""+path+"\"";
   };
   format_array_literal({ elements }) {
-    let space = this.space_for(imports.length);
+    if (elements.length===1) {
+      return "[]";
+    };
+    let space = this.space_for(elements.length);
     return "["+space+elements.map(this.format_node.bind(this)).join(","+space)+","+space[0]+"]";
   };
   format_js_op_expr({ lhs, type, rhs }) {
