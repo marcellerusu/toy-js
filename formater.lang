@@ -1,5 +1,5 @@
-import Lexer from "./dist/lexer.mjs"
-import Parser from "./dist/parser.mjs"
+import Lexer from "./lexer.mjs"
+import Parser from "./parser.mjs"
 import fs from "fs"
 import {
   IdLookup,
@@ -58,7 +58,7 @@ import {
   ObjLit,
   SimpleObjEntry,
   ObjClassArgEntry,
-} from "./dist/parser.mjs"
+} from "./parser.mjs"
 class Formatter(ast, { indentation = 0, parents = [] })
   get padding = Array(.indentation + 1).join(" ")
 
