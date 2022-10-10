@@ -17,7 +17,7 @@ import {
   NumberT, StrT
 } from "./parser.mjs"
 
-class TypeChecker(ast)
+class TypeChecker(ast, types = {})
   def check
     for let statement of .ast do
       .check_statement(statement)
@@ -28,16 +28,27 @@ class TypeChecker(ast)
   def check_statement(node)  
     if node is NamedLet
       .check_named_let(node)
+    else if node is FunctionDef
+      .check_function_def(node)
     else
       assert_not_reached! "Unknown node " + node.constructor.name
     end
   end
 
+  def check_function_def({ name, args, body, type })
+    .types[name] = { return_type: type, args: args }
+    null
+  end
+
   def infer(expr)
     if expr is NumExpr
-      return NumberT
+      return new NumberT()
     else if expr is StrExpr
-      return StrT
+      return new StrT()
+    else if expr is IdLookup
+      return .types[expr.name]
+    else if expr is FunctionCall
+      return .infer(expr.lhs_expr).return_type
     else
       assert_not_reached! "Can't infer " + expr.constructor.name
     end
@@ -47,11 +58,41 @@ class TypeChecker(ast)
     assert_not_reached! "type mismatch: expected `" + name + "` to be a " + expected + " but it was a " + got 
   end
 
-  def check_named_let({ name, expr, type })
-    if type is .infer(expr)
-      return null
+  def is_match(a, b)
+    a.constructor === b.constructor
+  end
+
+  def check_expr(expr)
+    if expr is FunctionCall
+      .check_function_call(expr)
     else
-      .panic_mismatch(name, type.constructor.name, .infer(expr).name)
+      assert_not_reached! "check_expr: Unknown node " + expr.constructor.name
+    end
+  end
+
+  def pretty(obj)
+    obj.constructor.name + "(" + JSON.stringify(obj) + ")"
+  end
+
+  def check_function_call({ lhs_expr, args })
+    let { args: fn_arg_types } = .infer(lhs_expr)
+    for let iter of args.zip(fn_arg_types) do
+      let [value, {type}] = iter
+      if !.is_match(.infer(value), type)
+        .panic_mismatch(.pretty(value), type.constructor.name, .infer(value).constructor.name)
+      end
+    end
+    null
+  end
+
+  def check_named_let({ name, expr, type })
+    console.log(expr)
+    .check_expr(expr)
+    console.log(name, type, .infer(expr))
+    if .is_match(type, .infer(expr))
+      null
+    else
+      .panic_mismatch(name, type.constructor.name, .infer(expr))
     end
   end
 end

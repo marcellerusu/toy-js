@@ -12,9 +12,10 @@ import {
   IsNotOperator, ParenExpr, LetObjectDeconstruction,
   RegularObjectProperty, RenamedProperty, ImportStatement,
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
-  ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
+  ArrComma, DefaultObjClassArg, NamedClassArg, DefaultNamedClassArg,  ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup
 } from "./parser.mjs"
+
 
 import vm from "vm"
 let eval_context = vm.createContext()
@@ -30,6 +31,13 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
             "    sum += item;\n" + 
             "  }\n" + 
             "  return sum;\n" + 
+            "}\n" +
+            "Array.prototype.zip = function(other) {\n" +
+            "  let zipped = [];\n" +
+            "  for (let i = 0; i < this.length; i++) {\n" +
+            "    zipped.push([this[i], other[i]]);\n" +
+            "  }\n" +
+            "  return zipped;\n" +
             "}\n"
   js = ""
   get padding = Array(.indentation + 1).join(" ")
@@ -152,7 +160,10 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
         l += ", "
       else if entry is ArrNameEntry
         l += entry.name
+      else if entry is Array
+        l += .eval_object_deconstruction(entry)
       else
+        console.error(entry)
         assert_not_reached! "not valid array deconstruction property"
       end
     end
@@ -168,7 +179,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return "import { " + imports.join(", ") + " } from " + "\"" + path + "\""
   end
 
-  def eval_let_object_deconstruction({ entries, rhs })
+  def eval_object_deconstruction(entries)
     let js_entries = entries.
       map(entry =>
         if entry is RegularObjectProperty
@@ -179,7 +190,11 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
       ).
       join(",")
 
-    return "let { " + js_entries + " } = " + .eval_expr(rhs)
+    "{ " + js_entries + " }"
+  end
+
+  def eval_let_object_deconstruction({ entries, rhs })
+    "let " + .eval_object_deconstruction(entries) + " = " + .eval_expr(rhs)
   end
 
   def eval_paren_expr({ expr }) = "(" + .eval_expr(expr) + ")"
@@ -314,6 +329,8 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
       map(arg =>
         if arg is NamedClassArg
           arg.name
+        else if arg is DefaultNamedClassArg
+          arg.name + " = " + .eval_expr(arg.expr)
         else if arg is ObjClassArg
           .eval_obj_class_arg(arg)
         end
@@ -326,7 +343,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
         flatMap(property =>
           if property.entries
             property.entries.map(entry => entry.name)
-          else if property is NamedClassArg
+          else if property is NamedClassArg || property is DefaultNamedClassArg
             return property.name
           else
             property
@@ -394,7 +411,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return c
   end
 
-  def eval_js_op_expr({ lhs, type, rhs }) = .eval_expr(lhs) + type + .eval_expr(rhs)
+  def eval_js_op_expr({ lhs, type, rhs }) = .eval_expr(lhs) + " " +  type + " " +  .eval_expr(rhs)
 
   def eval_command_expr({ name, expr })
     if name === "comptime!"

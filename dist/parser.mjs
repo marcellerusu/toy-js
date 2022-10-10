@@ -9,6 +9,13 @@ Array.prototype.sum = function () {
   }
   return sum;
 };
+Array.prototype.zip = function (other) {
+  let zipped = [];
+  for (let i = 0; i < this.length; i++) {
+    zipped.push([this[i], other[i]]);
+  }
+  return zipped;
+};
 import {
   Let,
   Id,
@@ -101,10 +108,11 @@ export class JsOpExpr {
   }
 }
 export class FunctionDef {
-  constructor(name, args, body) {
+  constructor(name, args, body, type) {
     this.name = name;
     this.args = args;
     this.body = body;
+    this.type = type;
   }
 }
 export class ReturnExpr {
@@ -248,8 +256,9 @@ export class SpreadArg {
   }
 }
 export class SimpleArg {
-  constructor(name) {
+  constructor(name, type) {
     this.name = name;
+    this.type = type;
   }
 }
 export class SimpleDefaultArg {
@@ -339,6 +348,12 @@ export class DefaultImport {
 export class NamedClassArg {
   constructor(name) {
     this.name = name;
+  }
+}
+export class DefaultNamedClassArg {
+  constructor(name, expr) {
+    this.name = name;
+    this.expr = expr;
   }
 }
 export class ObjClassArg {
@@ -500,7 +515,7 @@ class Parser {
       return this.parse_prefix_dot_lookup();
     }
   }
-  ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup];
+  ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup, PropertyLookup];
   parse_node_assignment(lhs_expr) {
     this.consume(Eq);
     let rhs_expr = this.parse_expr();
@@ -770,7 +785,12 @@ class Parser {
     return new ObjClassArg(entries);
   }
   parse_class_arg() {
-    if (this.scan(Id)) {
+    if (this.scan(Id, Eq)) {
+      let { name } = this.consume(Id);
+      this.consume(Eq);
+      let expr = this.parse_expr();
+      return new DefaultNamedClassArg(name, expr);
+    } else if (this.scan(Id)) {
       let { name } = this.consume(Id);
       return new NamedClassArg(name);
     } else if (this.scan(OpenBrace)) {
@@ -824,7 +844,8 @@ class Parser {
         args.push(new SimpleDefaultArg(arg_name, expr));
       } else if (this.scan(Id)) {
         let { name: arg_name } = this.consume(Id);
-        args.push(new SimpleArg(arg_name));
+        let type = this.consume_type();
+        args.push(new SimpleArg(arg_name, type));
       } else if (this.scan(Spread)) {
         this.consume(Spread);
         let { name: arg_name } = this.consume(Id);
@@ -896,6 +917,7 @@ class Parser {
     if (this.scan(OpenParen)) {
       args = this.parse_arg_defs();
     }
+    let type = this.consume_type();
     let body = [];
     if (this.scan(Eq)) {
       this.consume(Eq);
@@ -915,7 +937,7 @@ class Parser {
       }
       this.consume(End);
     }
-    return new FunctionDef(name, args, body);
+    return new FunctionDef(name, args, body, type);
   }
   parse_js_op(lhs_expr) {
     let { op } = this.consume(JsOp);
@@ -991,16 +1013,19 @@ class Parser {
       if (this.scan(Comma)) {
         continue;
       }
-      let { name } = this.consume(Id);
-      entries.push(new ArrNameEntry(name));
+      if (this.scan(Id)) {
+        let { name } = this.consume(Id);
+        entries.push(new ArrNameEntry(name));
+      } else {
+        entries.push(this.parse_obj_deconstruction());
+      }
     }
     this.consume(CloseSquare);
     this.consume(Eq);
     let rhs = this.parse_expr();
     return new LetArrDeconstruction(entries, rhs);
   }
-  parse_let_obj() {
-    this.consume(Let);
+  parse_obj_deconstruction() {
     this.consume(OpenBrace);
     let entries = [];
     while (!this.scan(CloseBrace)) {
@@ -1010,11 +1035,19 @@ class Parser {
       }
     }
     this.consume(CloseBrace);
+    return entries;
+  }
+  parse_let_obj() {
+    this.consume(Let);
+    let entries = this.parse_obj_deconstruction();
     this.consume(Eq);
     let rhs = this.parse_expr();
     return new LetObjectDeconstruction(entries, rhs);
   }
   consume_type() {
+    if (!this.scan(Colon)) {
+      return null;
+    }
     this.consume(Colon);
     if (this.scan(Id).name === "number") {
       this.consume(Id);
@@ -1026,10 +1059,7 @@ class Parser {
   parse_let() {
     this.consume(Let);
     let { name } = this.consume(Id);
-    let type = null;
-    if (this.scan(Colon)) {
-      type = this.consume_type();
-    }
+    let type = this.consume_type();
     this.consume(Eq);
     let expr = this.parse_expr();
     return new NamedLet(name, expr, type);

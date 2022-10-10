@@ -15,7 +15,7 @@ export dataclass FunctionCall(lhs_expr, args)
 export dataclass IdLookup(name)
 export dataclass CommandExpr(name, expr)
 export dataclass JsOpExpr(lhs, type, rhs)
-export dataclass FunctionDef(name, args, body)
+export dataclass FunctionDef(name, args, body, type)
 export dataclass ReturnExpr(expr)
 export dataclass ContinueStatement
 export dataclass BreakStatement
@@ -43,7 +43,7 @@ export dataclass ExportDefault(expr)
 export dataclass ExportStatement(statement)
 export dataclass SpreadExpr(expr)
 export dataclass SpreadArg(name)
-export dataclass SimpleArg(name)
+export dataclass SimpleArg(name, type)
 export dataclass SimpleDefaultArg(name, expr)
 export dataclass ArrowFn(arg_name, return_expr)
 export dataclass IsOperator(lhs, rhs)
@@ -60,6 +60,7 @@ export dataclass ArrNameEntry(name)
 export dataclass ImportStatement(imports, path)
 export dataclass DefaultImport(name, path)
 export dataclass NamedClassArg(name)
+export dataclass DefaultNamedClassArg(name, expr)
 export dataclass ObjClassArg(entries)
 export dataclass ObjClassArgEntry(name)
 export dataclass DefaultObjClassArg(name, expr)
@@ -202,7 +203,7 @@ class Parser(tokens)
     end
   end
 
-  ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup]
+  ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup, PropertyLookup]
   def parse_node_assignment(lhs_expr)
     .consume(Eq)
     let rhs_expr = .parse_expr()
@@ -490,7 +491,12 @@ class Parser(tokens)
   end
 
   def parse_class_arg
-    if .scan(Id)
+    if .scan(Id, Eq)
+      let { name } = .consume(Id)
+      .consume(Eq)
+      let expr = .parse_expr()
+      return new DefaultNamedClassArg(name, expr)
+    else if .scan(Id)
       let { name } = .consume(Id)
       return new NamedClassArg(name)
     else if .scan(OpenBrace)
@@ -545,7 +551,8 @@ class Parser(tokens)
         args.push(new SimpleDefaultArg(arg_name, expr))
       else if .scan(Id)
         let { name: arg_name } = .consume(Id)
-        args.push(new SimpleArg(arg_name))
+        let type = .consume_type()
+        args.push(new SimpleArg(arg_name, type))
       else if .scan(Spread)
         .consume(Spread)
         let { name: arg_name } = .consume(Id)
@@ -614,6 +621,7 @@ class Parser(tokens)
     let { name } = .consume(Id)
     let args = []
     args = .parse_arg_defs() if .scan(OpenParen)
+    let type = .consume_type()
     let body = []
     if .scan(Eq)
       .consume(Eq)
@@ -632,7 +640,7 @@ class Parser(tokens)
       end
       .consume(End)
     end
-    new FunctionDef(name, args, body)
+    new FunctionDef(name, args, body, type)
   end
 
   def parse_js_op(lhs_expr)
@@ -713,8 +721,12 @@ class Parser(tokens)
         entries.push(new ArrComma())
       end
       continue if .scan(Comma)
-      let { name } = .consume(Id)
-      entries.push(new ArrNameEntry(name))
+      if .scan(Id)
+        let { name } = .consume(Id)
+        entries.push(new ArrNameEntry(name))
+      else
+        entries.push(.parse_obj_deconstruction())
+      end
     end
     .consume(CloseSquare)
     .consume(Eq)
@@ -722,8 +734,7 @@ class Parser(tokens)
     new LetArrDeconstruction(entries, rhs)
   end
 
-  def parse_let_obj
-    .consume(Let)
+  def parse_obj_deconstruction
     .consume(OpenBrace)
     let entries = []
     while !.scan(CloseBrace) do
@@ -731,12 +742,19 @@ class Parser(tokens)
       .consume(Comma) if !.scan(CloseBrace)
     end
     .consume(CloseBrace)
+    return entries
+  end
+
+  def parse_let_obj
+    .consume(Let)
+    let entries = .parse_obj_deconstruction()
     .consume(Eq)
     let rhs = .parse_expr()
     new LetObjectDeconstruction(entries, rhs)
   end
 
   def consume_type
+    return null if !.scan(Colon)
     .consume(Colon)
     if .scan(Id).name === "number"
       .consume(Id)
@@ -749,8 +767,7 @@ class Parser(tokens)
   def parse_let
     .consume(Let)
     let { name } = .consume(Id)
-    let type = null
-    type = .consume_type() if .scan(Colon)
+    let type = .consume_type()
     .consume(Eq)
     let expr = .parse_expr()
     new NamedLet(name, expr, type)
