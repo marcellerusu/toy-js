@@ -7,7 +7,7 @@ import {
   Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From
 } from "./lexer.mjs"
 
-export dataclass NamedLet(name, expr)
+export dataclass NamedLet(name, expr, type)
 export dataclass NumExpr(value)
 export dataclass RegexNode(value)
 export dataclass StrExpr(value)
@@ -63,6 +63,8 @@ export dataclass NamedClassArg(name)
 export dataclass ObjClassArg(entries)
 export dataclass ObjClassArgEntry(name)
 export dataclass DefaultObjClassArg(name, expr)
+export dataclass NumberT
+export dataclass StrT
 
 class Parser(tokens)
   index = 0
@@ -123,11 +125,11 @@ class Parser(tokens)
     let i = 0
     for let TokenClass of TokenClasses do
       if .tokens[.index + i] is not TokenClass
-        return false
+        return null
       end
       i += 1
     end
-    return true
+    return .tokens[.index + i - 1]
   end
 
   def parse_statement
@@ -734,12 +736,24 @@ class Parser(tokens)
     new LetObjectDeconstruction(entries, rhs)
   end
 
+  def consume_type
+    .consume(Colon)
+    if .scan(Id).name === "number"
+      .consume(Id)
+      return new NumberT()
+    else
+      assert_not_reached! "type not implemented " + this.cur_token.name
+    end
+  end
+
   def parse_let
     .consume(Let)
     let { name } = .consume(Id)
+    let type = null
+    type = .consume_type() if .scan(Colon)
     .consume(Eq)
     let expr = .parse_expr()
-    new NamedLet(name, expr)
+    new NamedLet(name, expr, type)
   end
 end
 

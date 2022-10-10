@@ -1,0 +1,59 @@
+import {
+  IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr,
+  JsOpExpr, FunctionDef, ReturnExpr, DataClassDef,
+  NewExpr, DotAccess, ClassDef, ClassInstanceEntry,
+  ClassGetterExpr, PrefixDotLookup, StrExpr,
+  NotExpr, ArrayLiteral, IfStatement, NodeAssignment,
+  NodePlusAssignment, WhileStatement, RegexNode,
+  ContinueStatement, BreakStatement, IfBranch,
+  ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault,
+  ExportStatement, SpreadExpr, SimpleArg, SpreadArg,
+  ArrowFn, IsOperator, BoundFunctionDef, ForLoop,
+  IsNotOperator, ParenExpr, LetObjectDeconstruction,
+  RegularObjectProperty, RenamedProperty, ImportStatement,
+  DefaultImport, LetArrDeconstruction, ArrNameEntry,
+  ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
+  SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
+  NumberT, StrT
+} from "./parser.mjs"
+
+class TypeChecker(ast)
+  def check
+    for let statement of .ast do
+      .check_statement(statement)
+    end
+    null
+  end
+
+  def check_statement(node)  
+    if node is NamedLet
+      .check_named_let(node)
+    else
+      assert_not_reached! "Unknown node " + node.constructor.name
+    end
+  end
+
+  def infer(expr)
+    if expr is NumExpr
+      return NumberT
+    else if expr is StrExpr
+      return StrT
+    else
+      assert_not_reached! "Can't infer " + expr.constructor.name
+    end
+  end
+
+  def panic_mismatch(name, expected, got)
+    assert_not_reached! "type mismatch: expected `" + name + "` to be a " + expected + " but it was a " + got 
+  end
+
+  def check_named_let({ name, expr, type })
+    if type is .infer(expr)
+      return null
+    else
+      .panic_mismatch(name, type.constructor.name, .infer(expr).name)
+    end
+  end
+end
+
+export default TypeChecker

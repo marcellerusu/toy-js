@@ -2,6 +2,13 @@ class Panic extends Error {}
 function panic(reason) {
   throw new Panic(reason);
 }
+Array.prototype.sum = function () {
+  let sum = 0;
+  for (let item of this) {
+    sum += item;
+  }
+  return sum;
+};
 import {
   Let,
   Id,
@@ -48,9 +55,10 @@ import {
   From,
 } from "./lexer.mjs";
 export class NamedLet {
-  constructor(name, expr) {
+  constructor(name, expr, type) {
     this.name = name;
     this.expr = expr;
+    this.type = type;
   }
 }
 export class NumExpr {
@@ -349,6 +357,8 @@ export class DefaultObjClassArg {
     this.expr = expr;
   }
 }
+export class NumberT {}
+export class StrT {}
 class Parser {
   constructor(tokens) {
     this.tokens = tokens;
@@ -416,11 +426,11 @@ class Parser {
     let i = 0;
     for (let TokenClass of TokenClasses) {
       if (!(this.tokens[this.index + i] instanceof TokenClass)) {
-        return false;
+        return null;
       }
       i += 1;
     }
-    return true;
+    return this.tokens[this.index + i - 1];
   }
   parse_statement() {
     if (this.scan(Let, OpenBrace)) {
@@ -1004,12 +1014,25 @@ class Parser {
     let rhs = this.parse_expr();
     return new LetObjectDeconstruction(entries, rhs);
   }
+  consume_type() {
+    this.consume(Colon);
+    if (this.scan(Id).name === "number") {
+      this.consume(Id);
+      return new NumberT();
+    } else {
+      panic("type not implemented " + this.cur_token.name);
+    }
+  }
   parse_let() {
     this.consume(Let);
     let { name } = this.consume(Id);
+    let type = null;
+    if (this.scan(Colon)) {
+      type = this.consume_type();
+    }
     this.consume(Eq);
     let expr = this.parse_expr();
-    return new NamedLet(name, expr);
+    return new NamedLet(name, expr, type);
   }
 }
 export default Parser;

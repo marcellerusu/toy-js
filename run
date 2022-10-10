@@ -1,0 +1,3 @@
+#!/bin/zsh
+
+node ./dist/main.mjs $1.lang > output.mjs && cat output.mjs > ./dist/$1.mjs && node ./dist/main.mjs $2 $3
