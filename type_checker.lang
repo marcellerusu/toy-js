@@ -17,6 +17,8 @@ import {
   NumberT, StrT
 } from "./parser.mjs"
 
+dataclass FnT(args, return_type)
+
 class TypeChecker(ast, types = {})
   def check
     for let statement of .ast do
@@ -30,14 +32,20 @@ class TypeChecker(ast, types = {})
       .check_named_let(node)
     else if node is FunctionDef
       .check_function_def(node)
+    else if node is ReturnExpr
+      .check_expr(node.expr)
     else
       assert_not_reached! "Unknown node " + node.constructor.name
     end
   end
 
   def check_function_def({ name, args, body, type })
-    .types[name] = { return_type: type, args: args }
-    null
+    .types[name] = new FnT(args, type)
+    let sub_types = structuredClone(.types)
+    for let arg of args do
+      sub_types[arg.name] = arg.type
+    end
+    new TypeChecker(body, sub_types).check()
   end
 
   def infer(expr)
@@ -62,9 +70,24 @@ class TypeChecker(ast, types = {})
     a.constructor === b.constructor
   end
 
+  def infer_js_op(type)
+    if type === "+"
+      return new FnT([{ type: new NumberT() }, { type: new NumberT() }], new NumberT())
+    else
+      assert_not_reached! "unknown js op type " + type
+    end
+  end
+
   def check_expr(expr)
     if expr is FunctionCall
       .check_function_call(expr)
+    else if expr is JsOpExpr
+      let lhs = .infer(expr.lhs)
+      let rhs = .infer(expr.rhs)
+      assert_not_reached! "js operands don't match" if !.is_match(lhs, rhs)
+      let { args, return_type } = .infer_js_op(expr.type)
+      assert_not_reached! "js op arg type mismatch" if !.is_match(lhs, args[0].type)
+      assert_not_reached! "js op return type mismatch" if !.is_match(lhs, return_type)
     else
       assert_not_reached! "check_expr: Unknown node " + expr.constructor.name
     end
