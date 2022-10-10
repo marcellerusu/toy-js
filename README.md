@@ -12,9 +12,18 @@ The results are as of bootstrapping there were ~1500 lines of toy-js vs the ~200
 
 # Progress
 
+## Bootstrapping [DONE]
+
 - [x] can compile the lexer
 - [x] can compile the parser
 - [x] can compile the codegen
+
+## Formatting
+
+- [x] can format the formatter
+- [ ] can format lexer
+- [ ] can format parser
+- [ ] can format codegen
 
 # Syntax
 

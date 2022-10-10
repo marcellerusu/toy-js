@@ -141,11 +141,19 @@ class Formatter(ast, { indentation = 0, parents = [] })
       return .format_obj_lit(node)
     else if node is NotExpr
       return "!" + .format_node(node.expr)
+    else if node is ArrowFn
+      return .format_arrow_fn(node)
     else if node is LetArrDeconstruction
       return .format_let_arr_deconstruction(node)
+    else if node is LetObjectDeconstruction
+      return .format_let_object_deconstruction(node)
     else
       assert_not_reached! "Format not implemented for " + node.constructor.name
     end
+  end
+
+  def format_arrow_fn({ arg_name, return_expr })
+    arg_name + " => " + .format_node(return_expr)
   end
 
   def format_let_arr_entry(entry)
@@ -160,6 +168,20 @@ class Formatter(ast, { indentation = 0, parents = [] })
 
   def format_let_arr_deconstruction({ entries, rhs })
     "let [" + entries.map(::format_let_arr_entry).join(", ") + "] = " + .format_node(rhs)
+  end
+
+  def format_let_object_entry(entry)
+    if entry is RegularObjectProperty
+      return entry.name
+    else if entry is RenamedProperty
+      return entry.old_name + ": " + entry.new_name
+    else
+      assert_not_reached! "Let arr unknown " + entry.constructor.name
+    end
+  end
+
+  def format_let_object_deconstruction({ entries, rhs })
+    "let { " + entries.map(::format_let_object_entry).join(", ") + " } = " + .format_node(rhs)
   end
 
   def format_obj_lit_entry(entry)

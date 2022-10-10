@@ -2,27 +2,69 @@ import Lexer from "./dist/lexer.mjs"
 import Parser from "./dist/parser.mjs"
 import fs from "fs"
 import {
-  IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr,
-  JsOpExpr, FunctionDef, ReturnExpr, DataClassDef,
-  NewExpr, DotAccess, ClassDef, ClassInstanceEntry,
-  ClassGetterExpr, PrefixDotLookup, StrExpr,
-  NotExpr, ArrayLiteral, IfStatement, NodeAssignment,
-  NodePlusAssignment, WhileStatement, RegexNode,
-  ContinueStatement, BreakStatement, IfBranch, PrefixBindLookup,
-  ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault,
-  ExportStatement, SpreadExpr, SimpleArg, SpreadArg,
-  ArrowFn, IsOperator, BoundFunctionDef, ForLoop,
-  IsNotOperator, ParenExpr, LetObjectDeconstruction,
-  RegularObjectProperty, RenamedProperty, ImportStatement,
-  DefaultImport, LetArrDeconstruction, ArrNameEntry,
-  ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
-  SimpleDefaultArg, ObjLit, SimpleObjEntry, ObjClassArgEntry
+  IdLookup,
+  NamedLet,
+  NumExpr,
+  FunctionCall,
+  CommandExpr,
+  JsOpExpr,
+  FunctionDef,
+  ReturnExpr,
+  DataClassDef,
+  NewExpr,
+  DotAccess,
+  ClassDef,
+  ClassInstanceEntry,
+  ClassGetterExpr,
+  PrefixDotLookup,
+  StrExpr,
+  NotExpr,
+  ArrayLiteral,
+  IfStatement,
+  NodeAssignment,
+  NodePlusAssignment,
+  WhileStatement,
+  RegexNode,
+  ContinueStatement,
+  BreakStatement,
+  IfBranch,
+  PrefixBindLookup,
+  ElseIfBranch,
+  ElseBranch,
+  PropertyLookup,
+  ExportDefault,
+  ExportStatement,
+  SpreadExpr,
+  SimpleArg,
+  SpreadArg,
+  ArrowFn,
+  IsOperator,
+  BoundFunctionDef,
+  ForLoop,
+  IsNotOperator,
+  ParenExpr,
+  LetObjectDeconstruction,
+  RegularObjectProperty,
+  RenamedProperty,
+  ImportStatement,
+  DefaultImport,
+  LetArrDeconstruction,
+  ArrNameEntry,
+  ArrComma,
+  DefaultObjClassArg,
+  NamedClassArg,
+  ObjClassArg,
+  SimpleDefaultArg,
+  ObjLit,
+  SimpleObjEntry,
+  ObjClassArgEntry,
 } from "./dist/parser.mjs"
-
 class Formatter(ast, { indentation = 0, parents = [] })
   get padding = Array(.indentation + 1).join(" ")
-  def indent = .indentation += 2
-  def dedent = .indentation += -2
+
+  def indent() = .indentation += 2
+
+  def dedent() = .indentation += -2
 
   def space_for(count, max = 5)
     let space = " "
@@ -31,7 +73,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
       space = "\n" + .padding
       .indentation += -2
     end
-    return space
+    space
   end
 
   def format
@@ -43,12 +85,10 @@ class Formatter(ast, { indentation = 0, parents = [] })
       output += "\n"
       i += 1
     end
-    return output
+    output
   end
 
-  get is_in_if = .parents.at(-1) === IfBranch
-    || .parents.at(-1) === ElseIfBranch
-    || .parents.at(-1) === ElseBranch
+  get is_in_if = .parents.at(-1) === IfBranch || .parents.at(-1) === ElseIfBranch || .parents.at(-1) === ElseBranch
 
   def format_node(node, is_last = false)
     if node is FunctionDef
@@ -159,7 +199,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
       let obj_lit = "{\n" + .padding + entries.map(::format_obj_lit_entry).join(",\n" + .padding) + ",\n"
       .dedent()
       return obj_lit + .padding + "}"
-    else 
+    else
       return "{ " + entries_js.join(", ") + " }"
     end
   end
@@ -170,19 +210,15 @@ class Formatter(ast, { indentation = 0, parents = [] })
     .format_node(lhs) + "[" + .format_node(property) + "]"
   end
 
-  def format_prefix_bind_lookup({ name })
-    "::" + name
-  end
+  def format_prefix_bind_lookup({ name }) = "::" + name
 
-  def format_command_expr({ name, expr })
-    name + " " + .format_node(expr)
-  end
+  def format_command_expr({ name, expr }) = name + " " + .format_node(expr)
 
   def format_is_operator({ lhs, rhs })
     .format_node(lhs) + " is " + .format_node(rhs)
   end
 
-  def format_if_branch({ test_expr, body })  
+  def format_if_branch({ test_expr, body })
     let i = "if " + .format_node(test_expr) + "\n"
     i += .format_body(body, IfBranch)
     i
@@ -194,9 +230,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
     i
   end
 
-  def format_else_branch({ body })  
-    "else\n" + .format_body(body, ElseBranch)
-  end
+  def format_else_branch({ body }) = "else\n" + .format_body(body, ElseBranch)
 
   def format_branch(branch)
     if branch is IfBranch
@@ -211,7 +245,10 @@ class Formatter(ast, { indentation = 0, parents = [] })
   end
 
   def is_one_line_return(body) = body.length === 1 && body[0] is ReturnExpr
-  def is_early_return(branches) = branches.length === 1 && branches[0] is IfBranch && .is_one_line_return(branches[0].body)
+
+  def is_early_return(branches)
+    branches.length === 1 && branches[0] is IfBranch && .is_one_line_return(branches[0].body)
+  end
 
   def format_if_statement({ branches })
     if .is_early_return(branches)
@@ -228,7 +265,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
     else if entry is FunctionDef
       return .format_function_def(entry)
     else
-      assert_not_reached! "class entry: " +  entry.constructor.name
+      assert_not_reached! "class entry: " + entry.constructor.name
     end
   end
 
@@ -265,9 +302,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
     c += "end"
   end
 
-  def format_dot_access({ lhs, property })
-    .format_node(lhs) + "." + property
-  end
+  def format_dot_access({ lhs, property }) = .format_node(lhs) + "." + property
 
   def format_function_call({ lhs_expr, args })
     let start = ""
@@ -280,9 +315,8 @@ class Formatter(ast, { indentation = 0, parents = [] })
       .indentation += -2
       ending = ",\n" + .padding
     end
-    let args_output = start + args.map(::format_node).join(separator) 
+    let args_output = start + args.map(::format_node).join(separator)
     args_output += ending
-
     .format_node(lhs_expr) + "(" + args_output + ")"
   end
 
@@ -298,15 +332,14 @@ class Formatter(ast, { indentation = 0, parents = [] })
     let f = "for let " + iter_name + " of " + .format_node(iterable_expr) + " do\n"
     f += .format_body(body, ForLoop)
     f += .padding + "end"
-    return f
+    f
   end
 
   def format_import_statement({ imports, path })
     let space = .space_for(imports.length)
-
     let i = "import {" + space + imports.join("," + space) + "," + space[0] + "}"
     i += " from " + "\"" + path + "\""
-    return i
+    i
   end
 
   def format_default_import({ name, path })
@@ -314,24 +347,20 @@ class Formatter(ast, { indentation = 0, parents = [] })
   end
 
   def format_array_literal({ elements })
-    return "[]" if elements.length === 1
+    return "[]" if elements.length === 0
     let space = .space_for(elements.length)
-    return "[" + space + elements.map(::format_node).join("," + space) + "," + space[0] + "]"
+    "[" + space + elements.map(::format_node).join("," + space) + "," + space[0] + "]"
   end
 
   def format_js_op_expr({ lhs, type, rhs })
     .format_node(lhs) + " " + type + " " + .format_node(rhs)
   end
 
-  def format_named_let({ name, expr })
-    "let " + name + " = " + .format_node(expr)
-  end
+  def format_named_let({ name, expr }) = "let " + name + " = " + .format_node(expr)
 
-  def format_num_expr({ value })
-    value
-  end
+  def format_num_expr({ value }) = value
 
-  def format_return_expr({ expr }, is_last)  
+  def format_return_expr({ expr }, is_last)
     return .format_node(expr) if is_last
     "return " + .format_node(expr)
   end
@@ -339,7 +368,7 @@ class Formatter(ast, { indentation = 0, parents = [] })
   def format_body(body, parent, indent_by = 2)
     new Formatter(body, {
       indentation: .indentation + indent_by,
-      parents: .parents.concat(parent)
+      parents: .parents.concat(parent),
     }).format().trimEnd() + "\n"
   end
 
@@ -372,22 +401,15 @@ class Formatter(ast, { indentation = 0, parents = [] })
       f += "\n"
       f += .format_body(body, FunctionDef)
       f += .padding + "end"
-
       return f
     else
       return "def " + name + "(" + args.map(::format_arg).join(", ") + ") = " + .format_node(body[0], true)
     end
   end
 end
-
-
-
 let [, , file_name] = process.argv
-
 let str = fs.readFileSync(file_name).toString()
-
 let tokens = new Lexer(str).tokenize()
 let ast = new Parser(tokens).parse()
 let output = new Formatter(ast).format()
-# console.log(output)
 fs.writeFileSync(file_name, output)

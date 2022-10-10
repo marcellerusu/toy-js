@@ -289,7 +289,7 @@ class Formatter {
     return "import "+name+" from "+"\""+path+"\"";
   };
   format_array_literal({ elements }) {
-    if (elements.length===1) {
+    if (elements.length===0) {
       return "[]";
     };
     let space = this.space_for(elements.length);
