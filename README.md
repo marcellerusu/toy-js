@@ -25,6 +25,15 @@ The results are as of bootstrapping there were ~1500 lines of toy-js vs the ~200
 - [ ] can format parser
 - [ ] can format codegen
 
+## Type Checker
+
+- [x] basic functions
+- [x] primitives (number, string)
+- [x] builtins for console
+- [x] basic let type inference
+- [ ] polymorphic functions (+)
+- [ ] ... more
+
 # Syntax
 
 this snippet shows off some of the usable features so far
