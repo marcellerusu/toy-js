@@ -23,8 +23,16 @@ class FnT {
     this.return_type = return_type;
   }
 };
+class AnyT {};
+class NilT {};
+class ObjT {
+  constructor(properties) {
+    this.properties = properties;
+  }
+};
+let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NilT()) }) };
 class TypeChecker {
-  constructor(ast, types = {  }) {
+  constructor(ast, types = BUILTIN_TYPES) {
     this.ast = ast;
     this.types = types;
   }
@@ -41,13 +49,15 @@ class TypeChecker {
       this.check_function_def(node);
     } else if (node instanceof ReturnExpr) {
       this.check_expr(node.expr);
+    } else if (node instanceof FunctionCall) {
+      this.check_function_call(node);
     } else {
-      panic("Unknown node " + node.constructor.name);
+      panic("Unknown statement " + node.constructor.name);
     };
   };
   check_function_def({ name, args, body, type }) {
     this.types[name] = new FnT(args, type);
-    let sub_types = structuredClone(this.types);
+    let sub_types = Object.assign({  }, this.types);
     for (let arg of args) {
       sub_types[arg.name] = arg.type;
     };
@@ -59,9 +69,14 @@ class TypeChecker {
     } else if (expr instanceof StrExpr) {
       return new StrT();
     } else if (expr instanceof IdLookup) {
+      if (!this.types[expr.name]) {
+        panic("unknown type for " + expr.name);
+      };
       return this.types[expr.name];
     } else if (expr instanceof FunctionCall) {
       return this.infer(expr.lhs_expr).return_type;
+    } else if (expr instanceof DotAccess) {
+      return this.infer(expr.lhs).properties[expr.property];
     } else {
       panic("Can't infer " + expr.constructor.name);
     };
@@ -79,22 +94,29 @@ class TypeChecker {
       panic("unknown js op type " + type);
     };
   };
+  check_js_op_expr({ lhs, rhs, type }) {
+    let lhs_t = this.infer(lhs);
+    let rhs_t = this.infer(rhs);
+    if (!this.is_match(lhs_t, rhs_t)) {
+      panic("js operands don't match");
+    };
+    let { args,return_type } = this.infer_js_op(type);
+    if (!this.is_match(lhs_t, args[0].type)) {
+      panic("js op arg type mismatch");
+    };
+    if (!this.is_match(lhs_t, return_type)) {
+      panic("js op return type mismatch");
+    };
+  };
   check_expr(expr) {
     if (expr instanceof FunctionCall) {
       this.check_function_call(expr);
+    } else if (expr instanceof NumExpr) {
+      null;
+    } else if (expr instanceof StrExpr) {
+      null;
     } else if (expr instanceof JsOpExpr) {
-      let lhs = this.infer(expr.lhs);
-      let rhs = this.infer(expr.rhs);
-      if (!this.is_match(lhs, rhs)) {
-        panic("js operands don't match");
-      };
-      let { args,return_type } = this.infer_js_op(expr.type);
-      if (!this.is_match(lhs, args[0].type)) {
-        panic("js op arg type mismatch");
-      };
-      if (!this.is_match(lhs, return_type)) {
-        panic("js op return type mismatch");
-      };
+      this.check_js_op_expr(expr);
     } else {
       panic("check_expr: Unknown node " + expr.constructor.name);
     };
@@ -103,7 +125,16 @@ class TypeChecker {
     return obj.constructor.name + "(" + JSON.stringify(obj) + ")";
   };
   check_function_call({ lhs_expr, args }) {
+    for (let arg of args) {
+      this.check_expr(arg);
+    };
     let { args: fn_arg_types } = this.infer(lhs_expr);
+    if (fn_arg_types instanceof AnyT) {
+      return null;
+    };
+    if (fn_arg_types.length !== args.length) {
+      panic("args length mismatch");
+    };
     for (let iter of args.zip(fn_arg_types)) {
       let [value, { type }] = iter;
       if (!this.is_match(this.infer(value), type)) {
@@ -113,13 +144,16 @@ class TypeChecker {
     return null;
   };
   check_named_let({ name, expr, type }) {
-    console.log(expr);
     this.check_expr(expr);
-    console.log(name, type, this.infer(expr));
-    if (this.is_match(type, this.infer(expr))) {
-      null;
+    let inferred_type = this.infer(expr);
+    if (!type) {
+      this.types[name] = inferred_type;
+    } else if (this.is_match(type, this.infer(expr))) {
+      this.types[name] = type;
     } else {
-      this.panic_mismatch(name, type.constructor.name, this.infer(expr));
+      console.log(name, type, this.infer(expr));
+      console.log(expr);
+      this.panic_mismatch(name, type.constructor.name, this.infer(expr).constructor.name);
     };
   };
 };

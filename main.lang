@@ -3,6 +3,7 @@ import Lexer from "./lexer.mjs"
 import Parser from "./parser.mjs"
 import TypeChecker from "./type_checker.mjs"
 import CodeGen from "./codegen.mjs"
+import {inspect} from "util"
 
 let [, , file_name, option] = process.argv
 
@@ -14,6 +15,13 @@ let parser = new Parser(tokens)
 let ast = parser.parse()
 if option === "-t"
   new TypeChecker(ast).check()
+end
+
+if option === "-tc"
+  let tc = new TypeChecker(ast)
+  tc.check()
+  console.log(inspect(tc.types, { depth: null }))
+  process.exit(0)
 end
 let code_gen = new CodeGen(ast)
 let js = code_gen.eval()

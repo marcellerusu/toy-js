@@ -759,6 +759,9 @@ class Parser(tokens)
     if .scan(Id).name === "number"
       .consume(Id)
       return new NumberT()
+    else if .scan(Id).name === "string"
+      .consume(Id)
+      return new StrT()
     else
       assert_not_reached! "type not implemented " + this.cur_token.name
     end
