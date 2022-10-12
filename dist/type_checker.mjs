@@ -43,7 +43,7 @@ class UnionT {
     this.types = types;
   }
 };
-let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NilT()) }) };
+let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NilT()) }), process: new ObjT({ argv: new ArrayT(new StrT()) }) };
 class TypeChecker {
   constructor(ast, types = BUILTIN_TYPES) {
     this.ast = ast;
@@ -64,9 +64,26 @@ class TypeChecker {
       this.check_expr(node.expr);
     } else if (node instanceof FunctionCall) {
       this.check_function_call(node);
+    } else if (node instanceof LetArrDeconstruction) {
+      this.check_let_arr_deconstruction(node);
     } else {
       panic("Unknown statement " + node.constructor.name);
     };
+  };
+  check_let_arr_deconstruction({ entries, rhs }) {
+    let { type } = this.infer(rhs);
+    for (let entry of entries) {
+      if (entry instanceof ArrComma) {
+        continue;
+      };
+      if (entry instanceof ArrNameEntry) {
+        this.types[entry.name] = type;
+      } else {
+        console.log(entry);
+        panic("unknown array entry " + entry.constructor.name);
+      };
+    };
+    return null;
   };
   check_function_def({ name, args, body, type }) {
     let sub_types = Object.assign({  }, this.types);

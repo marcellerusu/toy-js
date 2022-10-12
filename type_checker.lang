@@ -26,6 +26,7 @@ dataclass UnionT(types)
 
 let BUILTIN_TYPES = {
   console: new ObjT({ log: new FnT(new AnyT(), new NilT()) })
+  process: new ObjT({ argv: new ArrayT(new StrT()) })
 }
 
 class TypeChecker(ast, types = BUILTIN_TYPES)
@@ -45,9 +46,25 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       .check_expr(node.expr)
     else if node is FunctionCall
       .check_function_call(node)
+    else if node is LetArrDeconstruction
+      .check_let_arr_deconstruction(node)
     else
       assert_not_reached! "Unknown statement " + node.constructor.name
     end
+  end
+
+  def check_let_arr_deconstruction({ entries, rhs })
+    let { type } = .infer(rhs)
+    for let entry of entries do
+      continue if entry is ArrComma
+      if entry is ArrNameEntry
+        .types[entry.name] = type
+      else
+        console.log(entry)
+        assert_not_reached! "unknown array entry " + entry.constructor.name
+      end
+    end
+    null
   end
 
   def check_function_def({ name, args, body, type })
