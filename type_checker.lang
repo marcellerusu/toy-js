@@ -21,6 +21,8 @@ dataclass FnT(args, return_type)
 dataclass AnyT
 dataclass NilT
 dataclass ObjT(properties)
+dataclass ArrayT(type)
+dataclass UnionT(types)
 
 let BUILTIN_TYPES = {
   console: new ObjT({ log: new FnT(new AnyT(), new NilT()) })
@@ -77,8 +79,19 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       return .infer(expr.lhs_expr).return_type
     else if expr is DotAccess
       return .infer(expr.lhs).properties[expr.property]
+    else if expr is ArrayLiteral
+      return .infer_array_literal(expr)
     else
-      assert_not_reached! "Can't infer " + expr.constructor.name
+      assert_not_reached! "Cant infer " + expr.constructor.name
+    end
+  end
+
+  def infer_array_literal({ elements })
+    let types = elements.map(::infer).uniq_by(::is_match)
+    if types.length === 1
+      return new ArrayT(types[0])
+    else
+      return new ArrayT(new UnionT(types))
     end
   end
 
@@ -125,9 +138,15 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       null
     else if expr is JsOpExpr
       .check_js_op_expr(expr)
+    else if expr is ArrayLiteral
+      .check_array_literal(expr)
     else
       assert_not_reached! "check_expr: Unknown node " + expr.constructor.name
     end
+  end
+
+  def check_array_literal({ elements })
+    elements.map(::check_expr)
   end
 
   def pretty(obj)

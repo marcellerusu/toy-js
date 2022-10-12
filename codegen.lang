@@ -38,7 +38,11 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
             "    zipped.push([this[i], other[i]]);\n" +
             "  }\n" +
             "  return zipped;\n" +
-            "}\n"
+            "}\n" +
+            "Array.prototype.uniq_by = function(predicate) {\n" +
+            "  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))\n" +
+            "};\n"
+
   js = ""
   get padding = Array(.indentation + 1).join(" ")
 

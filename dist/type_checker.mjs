@@ -16,6 +16,9 @@ Array.prototype.zip = function(other) {
   }
   return zipped;
 }
+Array.prototype.uniq_by = function(fn) {
+  return this.filter((x, i) => i === this.findIndex(y => fn(x, y)))
+};
 import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumberT, StrT } from "./parser.mjs";
 class FnT {
   constructor(args, return_type) {
@@ -28,6 +31,16 @@ class NilT {};
 class ObjT {
   constructor(properties) {
     this.properties = properties;
+  }
+};
+class ArrayT {
+  constructor(type) {
+    this.type = type;
+  }
+};
+class UnionT {
+  constructor(types) {
+    this.types = types;
   }
 };
 let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NilT()) }) };
@@ -86,8 +99,18 @@ class TypeChecker {
       return this.infer(expr.lhs_expr).return_type;
     } else if (expr instanceof DotAccess) {
       return this.infer(expr.lhs).properties[expr.property];
+    } else if (expr instanceof ArrayLiteral) {
+      return this.infer_array_literal(expr);
     } else {
-      panic("Can't infer " + expr.constructor.name);
+      panic("Cant infer " + expr.constructor.name);
+    };
+  };
+  infer_array_literal({ elements }) {
+    let types = elements.map(this.infer.bind(this)).uniq_by(this.is_match.bind(this));
+    if (types.length === 1) {
+      return new ArrayT(types[0]);
+    } else {
+      return new ArrayT(new UnionT(types));
     };
   };
   panic_mismatch(name, expected, got) {
@@ -131,9 +154,14 @@ class TypeChecker {
       null;
     } else if (expr instanceof JsOpExpr) {
       this.check_js_op_expr(expr);
+    } else if (expr instanceof ArrayLiteral) {
+      this.check_array_literal(expr);
     } else {
       panic("check_expr: Unknown node " + expr.constructor.name);
     };
+  };
+  check_array_literal({ elements }) {
+    return elements.map(this.check_expr.bind(this));
   };
   pretty(obj) {
     return obj.constructor.name + "(" + JSON.stringify(obj) + ")";

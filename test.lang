@@ -1,5 +1,1 @@
-def add(a: string, b: string) = a ++ b
-
-let num = add("wtf", "Wtf")
-
-console.log(num ++ "oh")
+let num = [1, "str", 3]
