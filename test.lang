@@ -2,4 +2,6 @@ let num = [1, "s", 3]
 
 let b = num.push("s")
 
+let c: string = b.toString()
+
 console.log(b + 2)

@@ -101,13 +101,24 @@ class TypeChecker {
       let lhs_t = this.infer(expr.lhs);
       if (lhs_t instanceof ArrayT) {
         return this.infer_array_method(lhs_t, expr.property);
-      } else {
+      } else if (lhs_t instanceof ObjT) {
         return this.infer(expr.lhs).properties[expr.property];
+      } else if (lhs_t instanceof NumberT) {
+        return this.infer_number_method(expr.property);
+      } else {
+        panic("unknown lhs of dot access " + lhs_t.constructor.name);
       };
     } else if (expr instanceof ArrayLiteral) {
       return this.infer_array_literal(expr);
     } else {
       panic("Cant infer " + expr.constructor.name);
+    };
+  };
+  infer_number_method(property) {
+    if (property === "toString") {
+      return new FnT([], new StrT());
+    } else {
+      panic("unknown property `" + property + "` on number");
     };
   };
   infer_array_method(arr_t, property) {

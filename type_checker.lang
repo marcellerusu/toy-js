@@ -86,13 +86,25 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       let lhs_t = .infer(expr.lhs)
       if lhs_t is ArrayT
         return .infer_array_method(lhs_t, expr.property)
-      else
+      else if lhs_t is ObjT
         return .infer(expr.lhs).properties[expr.property]
+      else if lhs_t is NumberT
+        return .infer_number_method(expr.property)
+      else
+        assert_not_reached! "unknown lhs of dot access " ++ lhs_t.constructor.name
       end
     else if expr is ArrayLiteral
       return .infer_array_literal(expr)
     else
       assert_not_reached! "Cant infer " + expr.constructor.name
+    end
+  end
+
+  def infer_number_method(property)
+    if property === "toString"
+      return new FnT([], new StrT())
+    else
+      assert_not_reached! "unknown property `" + property + "` on number"
     end
   end
 
