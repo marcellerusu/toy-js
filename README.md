@@ -31,7 +31,7 @@ The results are as of bootstrapping there were ~1500 lines of toy-js vs the ~200
 - [x] primitives (number, string)
 - [x] builtins for console
 - [x] basic let type inference
-- [ ] polymorphic functions (+)
+- [x] infer array type
 - [ ] ... more
 
 # Syntax
