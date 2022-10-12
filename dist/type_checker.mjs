@@ -56,23 +56,32 @@ class TypeChecker {
     };
   };
   check_function_def({ name, args, body, type }) {
-    this.types[name] = new FnT(args, type);
     let sub_types = Object.assign({  }, this.types);
+    let tc = new TypeChecker(body, sub_types);
+    if (!type) {
+      type = tc.infer(body.at(-1));
+    };
+    this.types[name] = new FnT(args, type);
     for (let arg of args) {
       sub_types[arg.name] = arg.type;
     };
-    return new TypeChecker(body, sub_types).check();
+    return tc.check();
   };
   infer(expr) {
     if (expr instanceof NumExpr) {
       return new NumberT();
     } else if (expr instanceof StrExpr) {
       return new StrT();
+    } else if (expr instanceof ReturnExpr) {
+      return this.infer(expr.expr);
+    } else if (expr instanceof JsOpExpr) {
+      return this.infer_js_op(expr.type).return_type;
     } else if (expr instanceof IdLookup) {
-      if (!this.types[expr.name]) {
-        panic("unknown type for " + expr.name);
+      if (this.types[expr.name]) {
+        return this.types[expr.name];
       };
-      return this.types[expr.name];
+      console.log(expr);
+      panic("unknown type for " + expr.name);
     } else if (expr instanceof FunctionCall) {
       return this.infer(expr.lhs_expr).return_type;
     } else if (expr instanceof DotAccess) {
@@ -90,6 +99,8 @@ class TypeChecker {
   infer_js_op(type) {
     if (type === "+") {
       return new FnT([{ type: new NumberT() }, { type: new NumberT() }], new NumberT());
+    } else if (type === "++") {
+      return new FnT([{ type: new StrT() }, { type: new StrT() }], new StrT());
     } else {
       panic("unknown js op type " + type);
     };
@@ -98,10 +109,13 @@ class TypeChecker {
     let lhs_t = this.infer(lhs);
     let rhs_t = this.infer(rhs);
     if (!this.is_match(lhs_t, rhs_t)) {
+      console.log(lhs_t, rhs_t);
       panic("js operands don't match");
     };
     let { args,return_type } = this.infer_js_op(type);
     if (!this.is_match(lhs_t, args[0].type)) {
+      console.log(type, return_type);
+      console.log(lhs_t, args[0].type);
       panic("js op arg type mismatch");
     };
     if (!this.is_match(lhs_t, return_type)) {

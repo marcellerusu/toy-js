@@ -411,7 +411,12 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return c
   end
 
-  def eval_js_op_expr({ lhs, type, rhs }) = .eval_expr(lhs) + " " +  type + " " +  .eval_expr(rhs)
+  def convert_js_op_type(type)
+    return "+" if type === "++"
+    type
+  end
+
+  def eval_js_op_expr({ lhs, type, rhs }) = .eval_expr(lhs) + " " + .convert_js_op_type(type) + " " +  .eval_expr(rhs)
 
   def eval_command_expr({ name, expr })
     if name === "comptime!"

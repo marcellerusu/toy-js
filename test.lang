@@ -1,5 +1,5 @@
-def add(a: number, b: number): number = a + b
+def add(a: string, b: string) = a ++ b
 
-let num = add(20, 20)
+let num = add("wtf", "Wtf")
 
-console.log(num + "str")
+console.log(num ++ "oh")

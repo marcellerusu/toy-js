@@ -374,8 +374,14 @@ class CodeGen {
     c += this.padding + "}";
     return c;
   };
+  convert_js_op_type(type) {
+    if (type === "++") {
+      return "+";
+    };
+    return type;
+  };
   eval_js_op_expr({ lhs, type, rhs }) {
-    return this.eval_expr(lhs) + " " + type + " " + this.eval_expr(rhs);
+    return this.eval_expr(lhs) + " " + this.convert_js_op_type(type) + " " + this.eval_expr(rhs);
   };
   eval_command_expr({ name, expr }) {
     if (name === "comptime!") {
