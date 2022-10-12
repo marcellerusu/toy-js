@@ -15,7 +15,7 @@ import {
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
   NumberT, StrT
-} from "./parser.mjs"
+} from "./parser"
 
 dataclass FnT(args, return_type)
 dataclass AnyT

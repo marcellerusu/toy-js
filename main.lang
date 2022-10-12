@@ -1,8 +1,8 @@
 import fs from "fs"
-import Lexer from "./lexer.mjs"
-import Parser from "./parser.mjs"
-import TypeChecker from "./type_checker.mjs"
-import CodeGen from "./codegen.mjs"
+import Lexer from "./lexer"
+import Parser from "./parser"
+import TypeChecker from "./type_checker"
+import CodeGen from "./codegen"
 import {inspect} from "util"
 
 let [, , file_name, option] = process.argv

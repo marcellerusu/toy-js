@@ -5,7 +5,7 @@ import {
   If, Else, PlusEq, While, Do, Regex, Continue,
   Break, Export, Default, Spread, Arrow, Is, Bind,
   Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From
-} from "./lexer.mjs"
+} from "./lexer"
 
 export dataclass NamedLet(name, expr, type)
 export dataclass NumExpr(value)

@@ -16,6 +16,9 @@ Array.prototype.zip = function(other) {
   }
   return zipped;
 }
+Array.prototype.uniq_by = function(predicate) {
+  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
+};
 import { Let, Id, Eq, Num, OpenParen, CloseParen, Comma, Command, JsOp, Def, Return, End, DataClass, New, Dot, Class, Get, Str, Bang, OpenSquare, CloseSquare, If, Else, PlusEq, While, Do, Regex, Continue, Break, Export, Default, Spread, Arrow, Is, Bind, Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From } from "./lexer.mjs";
 export class NamedLet {
   constructor(name, expr, type) {

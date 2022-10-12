@@ -16,6 +16,9 @@ Array.prototype.zip = function(other) {
   }
   return zipped;
 }
+Array.prototype.uniq_by = function(predicate) {
+  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
+};
 import fs from "fs";
 import Lexer from "./lexer.mjs";
 import Parser from "./parser.mjs";

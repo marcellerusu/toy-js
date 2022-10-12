@@ -14,8 +14,7 @@ import {
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, DefaultNamedClassArg,  ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup
-} from "./parser.mjs"
-
+} from "./parser"
 
 import vm from "vm"
 let eval_context = vm.createContext()
@@ -174,13 +173,21 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     l += "] = " + .eval_expr(rhs)
     return l
   end
+  
+  def replace_relative(path)
+    if path.startsWith("./")
+      return path + ".mjs"
+    else
+      return path
+    end
+  end
 
   def eval_default_import({ name, path })
-    return "import " + name + " from " + "\"" + path + "\""
+    return "import " + name + " from " + "\"" + .replace_relative(path) + "\""
   end
 
   def eval_import_statement({ imports, path })
-    return "import { " + imports.join(", ") + " } from " + "\"" + path + "\""
+    return "import { " + imports.join(", ") + " } from " + "\"" + .replace_relative(path) + "\""
   end
 
   def eval_object_deconstruction(entries)

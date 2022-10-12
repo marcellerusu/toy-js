@@ -2,262 +2,265 @@ class Panic extends Error {}
 function panic(reason) {
   throw new Panic(reason);
 }
-Array.prototype.sum = function () {
+Array.prototype.sum = function() {
   let sum = 0;
   for (let item of this) {
     sum += item;
   }
   return sum;
-};
-Array.prototype.zip = function (other) {
+}
+Array.prototype.zip = function(other) {
   let zipped = [];
   for (let i = 0; i < this.length; i++) {
     zipped.push([this[i], other[i]]);
   }
   return zipped;
+}
+Array.prototype.uniq_by = function(predicate) {
+  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
 };
 export class Id {
   constructor(line, name) {
     this.line = line;
     this.name = name;
   }
-}
+};
 export class Num {
   constructor(line, value, is_negative) {
     this.line = line;
     this.value = value;
     this.is_negative = is_negative;
   }
-}
+};
 export class Command {
   constructor(line, name) {
     this.line = line;
     this.name = name;
   }
-}
+};
 export class Str {
   constructor(line, value) {
     this.line = line;
     this.value = value;
   }
-}
+};
 export class Regex {
   constructor(line, value) {
     this.line = line;
     this.value = value;
   }
-}
+};
 export class JsOp {
   constructor(line, op) {
     this.line = line;
     this.op = op;
   }
-}
+};
 export class Let {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Eq {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class PlusEq {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class OpenParen {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class CloseParen {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Comma {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Def {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class End {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Return {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class DataClass {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class New {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Dot {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Class {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Get {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Bang {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class OpenSquare {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class CloseSquare {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class If {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Else {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Or {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class And {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class TripleEq {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class NotTripleEq {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class While {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Break {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Continue {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Do {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Export {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Default {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Spread {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Arrow {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Bind {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Is {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Not {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class For {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Of {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class OpenBrace {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class CloseBrace {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Colon {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class Import {
   constructor(line) {
     this.line = line;
   }
-}
+};
 export class From {
   constructor(line) {
     this.line = line;
   }
-}
+};
 class Lexer {
   constructor(str) {
     this.str = str;
@@ -265,36 +268,33 @@ class Lexer {
   index = 0;
   get rest_of_string() {
     return this.str.slice(this.index);
-  }
+  };
   get cur() {
     return this.str[this.index];
-  }
+  };
   matched = null;
   scan(regex) {
     let result = this.rest_of_string.match(regex);
     if (!result || result.index !== 0) {
       return false;
-    }
+    };
     this.index += result[0].length;
     this.matched = result[0];
     return true;
-  }
+  };
   parse_str() {
     let str = "";
     this.index += 1;
-    while (
-      this.cur !== '"' ||
-      (this.str[this.index - 1] === "\\" && this.str[this.index - 2] !== "\\")
-    ) {
+    while (this.cur !== "\"" || (this.str[this.index - 1] === "\\" && this.str[this.index - 2] !== "\\")) {
       str += this.cur;
       this.index += 1;
       if (this.cur === "\n") {
         panic("no new lines");
-      }
-    }
+      };
+    };
     this.index += 1;
     return str;
-  }
+  };
   tokenize() {
     let tokens = [];
     let line = 0;
@@ -342,7 +342,7 @@ class Lexer {
         tokens.push(new Return(line));
       } else if (this.scan(/dataclass\b/)) {
         tokens.push(new DataClass(line));
-      } else if (this.cur === '"') {
+      } else if (this.cur === "\"") {
         let parsed_str = this.parse_str();
         tokens.push(new Str(line, parsed_str));
       } else if (this.scan(/class\b/)) {
@@ -399,9 +399,10 @@ class Lexer {
         tokens.push(new Bang(line));
       } else {
         panic("nothing found");
-      }
-    }
+      };
+    };
     return tokens;
-  }
-}
+  };
+};
 export default Lexer;
+
