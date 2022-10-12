@@ -187,7 +187,6 @@ class TypeChecker {
     for (let arg of args) {
       this.check_expr(arg);
     };
-    console.log(lhs_expr);
     let { args: fn_arg_types } = this.infer(lhs_expr);
     if (fn_arg_types instanceof AnyT) {
       return null;
