@@ -98,11 +98,23 @@ class TypeChecker {
     } else if (expr instanceof FunctionCall) {
       return this.infer(expr.lhs_expr).return_type;
     } else if (expr instanceof DotAccess) {
-      return this.infer(expr.lhs).properties[expr.property];
+      let lhs_t = this.infer(expr.lhs);
+      if (lhs_t instanceof ArrayT) {
+        return this.infer_array_method(lhs_t, expr.property);
+      } else {
+        return this.infer(expr.lhs).properties[expr.property];
+      };
     } else if (expr instanceof ArrayLiteral) {
       return this.infer_array_literal(expr);
     } else {
       panic("Cant infer " + expr.constructor.name);
+    };
+  };
+  infer_array_method(arr_t, property) {
+    if (property === "push") {
+      return new FnT([{ type: arr_t.type }], new NumberT());
+    } else {
+      panic("unknown array method " + property);
     };
   };
   infer_array_literal({ elements }) {
@@ -117,6 +129,11 @@ class TypeChecker {
     return panic("type mismatch: expected `" + name + "` to be a " + expected + " but it was a " + got);
   };
   is_match(a, b) {
+    if (a instanceof UnionT) {
+      return a.types.some((type) => this.is_match(type, b));
+    } else if (b instanceof UnionT) {
+      return this.is_match(b, a);
+    };
     return a.constructor === b.constructor;
   };
   infer_js_op(type) {
@@ -170,6 +187,7 @@ class TypeChecker {
     for (let arg of args) {
       this.check_expr(arg);
     };
+    console.log(lhs_expr);
     let { args: fn_arg_types } = this.infer(lhs_expr);
     if (fn_arg_types instanceof AnyT) {
       return null;

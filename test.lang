@@ -1,1 +1,3 @@
-let num = [1, "str", 3]
+let num = [1, "s", 3]
+
+let b = num.push("s")

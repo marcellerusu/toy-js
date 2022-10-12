@@ -78,11 +78,24 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     else if expr is FunctionCall
       return .infer(expr.lhs_expr).return_type
     else if expr is DotAccess
-      return .infer(expr.lhs).properties[expr.property]
+      let lhs_t = .infer(expr.lhs)
+      if lhs_t is ArrayT
+        return .infer_array_method(lhs_t, expr.property)
+      else
+        return .infer(expr.lhs).properties[expr.property]
+      end
     else if expr is ArrayLiteral
       return .infer_array_literal(expr)
     else
       assert_not_reached! "Cant infer " + expr.constructor.name
+    end
+  end
+
+  def infer_array_method(arr_t, property)
+    if property === "push"
+      return new FnT([{ type: arr_t.type }], new NumberT())
+    else
+      assert_not_reached! "unknown array method " + property
     end
   end
 
@@ -100,6 +113,11 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
   end
 
   def is_match(a, b)
+    if a is UnionT
+      return a.types.some(type => .is_match(type, b))
+    else if b is UnionT
+      return .is_match(b, a)
+    end
     a.constructor === b.constructor
   end
 
@@ -157,6 +175,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     for let arg of args do
       .check_expr(arg)
     end
+    console.log(lhs_expr)
     let { args: fn_arg_types } = .infer(lhs_expr)
     return null if fn_arg_types is AnyT
     assert_not_reached! "args length mismatch" if fn_arg_types.length !== args.length
