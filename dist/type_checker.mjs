@@ -184,6 +184,10 @@ class TypeChecker {
       this.check_js_op_expr(expr);
     } else if (expr instanceof ArrayLiteral) {
       this.check_array_literal(expr);
+    } else if (expr instanceof IdLookup) {
+      if (!this.types[expr.name]) {
+        panic("can't find `" + expr.name + "`");
+      };
     } else {
       panic("check_expr: Unknown node " + expr.constructor.name);
     };

@@ -175,6 +175,8 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       .check_js_op_expr(expr)
     else if expr is ArrayLiteral
       .check_array_literal(expr)
+    else if expr is IdLookup
+      assert_not_reached! "can't find `" + expr.name + "`" if !.types[expr.name]
     else
       assert_not_reached! "check_expr: Unknown node " + expr.constructor.name
     end

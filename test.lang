@@ -4,4 +4,4 @@ let b = num.push("s")
 
 let c: string = b.toString()
 
-console.log(b + 2)
+console.log(b + 2, c)
