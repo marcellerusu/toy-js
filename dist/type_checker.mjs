@@ -19,7 +19,7 @@ Array.prototype.zip = function(other) {
 Array.prototype.uniq_by = function(predicate) {
   return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
 };
-import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumberT, StrT, ArrayT } from "./parser.mjs";
+import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumT, StrT, ArrayT } from "./parser.mjs";
 import Lexer from "./lexer.mjs";
 import Parser from "./parser.mjs";
 class FnT {
@@ -119,7 +119,7 @@ class TypeChecker {
       return this.infer_array_method(lhs_t, property);
     } else if (lhs_t instanceof ObjT) {
       return lhs_t.properties[property];
-    } else if (lhs_t instanceof NumberT) {
+    } else if (lhs_t instanceof NumT) {
       return this.infer_number_method(property);
     } else if (lhs_t instanceof DataClassT) {
       let p = lhs_t.properties.find((p) => p[0] === property);
@@ -138,7 +138,7 @@ class TypeChecker {
   };
   infer(expr) {
     if (expr instanceof NumExpr) {
-      return new NumberT();
+      return new NumT();
     } else if (expr instanceof StrExpr) {
       return new StrT();
     } else if (expr instanceof ReturnExpr) {
@@ -163,12 +163,12 @@ class TypeChecker {
     if (property === "toString") {
       return new FnT([], new StrT());
     } else {
-      panic("unknown property `" + property + "` on number");
+      panic("unknown property `" + property + "` on num");
     };
   };
   infer_array_method(arr_t, property) {
     if (property === "push") {
-      return new FnT([{ type: arr_t.type }], new NumberT());
+      return new FnT([{ type: arr_t.type }], new NumT());
     } else {
       panic("unknown array method " + property);
     };
@@ -194,7 +194,7 @@ class TypeChecker {
   };
   infer_js_op(type) {
     if (type === "+") {
-      return new FnT([{ type: new NumberT() }, { type: new NumberT() }], new NumberT());
+      return new FnT([{ type: new NumT() }, { type: new NumT() }], new NumT());
     } else if (type === "++") {
       return new FnT([{ type: new StrT() }, { type: new StrT() }], new StrT());
     } else {

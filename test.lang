@@ -1,4 +1,4 @@
-dataclass O(a: number, b: string, c: Array[string])
+dataclass Obj(a: num, b: str, c: Array[str])
 
 let [, , file_name, option] = process.argv
 

@@ -14,7 +14,7 @@ import {
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
-  NumberT, StrT, ArrayT
+  NumT, StrT, ArrayT
 } from "./parser"
 import Lexer from "./lexer"
 import Parser from "./parser"
@@ -105,7 +105,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       return .infer_array_method(lhs_t, property)
     else if lhs_t is ObjT
       return lhs_t.properties[property]
-    else if lhs_t is NumberT
+    else if lhs_t is NumT
       return .infer_number_method(property)
     else if lhs_t is DataClassT
       let p = lhs_t.properties.find(p => p[0] === property)
@@ -126,7 +126,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
 
   def infer(expr)
     if expr is NumExpr
-      return new NumberT()
+      return new NumT()
     else if expr is StrExpr
       return new StrT()
     else if expr is ReturnExpr
@@ -152,13 +152,13 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     if property === "toString"
       return new FnT([], new StrT())
     else
-      assert_not_reached! "unknown property `" + property + "` on number"
+      assert_not_reached! "unknown property `" + property + "` on num"
     end
   end
 
   def infer_array_method(arr_t, property)
     if property === "push"
-      return new FnT([{ type: arr_t.type }], new NumberT())
+      return new FnT([{ type: arr_t.type }], new NumT())
     else
       assert_not_reached! "unknown array method " + property
     end
@@ -188,7 +188,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
 
   def infer_js_op(type)
     if type === "+"
-      return new FnT([{ type: new NumberT() }, { type: new NumberT() }], new NumberT())
+      return new FnT([{ type: new NumT() }, { type: new NumT() }], new NumT())
     else if type === "++"
       return new FnT([{ type: new StrT() }, { type: new StrT() }], new StrT())
     else

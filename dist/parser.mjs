@@ -332,8 +332,9 @@ export class DefaultObjClassArg {
     this.expr = expr;
   }
 };
-export class NumberT {};
+export class NumT {};
 export class StrT {};
+export class BoolT {};
 export class ArrayT {
   constructor(type) {
     this.type = type;
@@ -990,12 +991,15 @@ class Parser {
     return new LetObjectDeconstruction(entries, rhs);
   };
   parse_type_expr() {
-    if (this.scan(Id).name === "number") {
+    if (this.scan(Id).name === "num") {
       this.consume(Id);
-      return new NumberT();
-    } else if (this.scan(Id).name === "string") {
+      return new NumT();
+    } else if (this.scan(Id).name === "str") {
       this.consume(Id);
       return new StrT();
+    } else if (this.scan(Id).name === "bool") {
+      this.consume(Id);
+      return new BoolT();
     } else if (this.scan(Id).name === "Array") {
       this.consume(Id);
       let [type] = this.parse_type_params();
