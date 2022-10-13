@@ -305,8 +305,9 @@ export class DefaultImport {
   }
 };
 export class NamedClassArg {
-  constructor(name) {
+  constructor(name, type) {
     this.name = name;
+    this.type = type;
   }
 };
 export class DefaultNamedClassArg {
@@ -333,6 +334,11 @@ export class DefaultObjClassArg {
 };
 export class NumberT {};
 export class StrT {};
+export class ArrayT {
+  constructor(type) {
+    this.type = type;
+  }
+};
 class Parser {
   constructor(tokens) {
     this.tokens = tokens;
@@ -785,7 +791,7 @@ class Parser {
         args.push(new SimpleDefaultArg(arg_name, expr));
       } else if (this.scan(Id)) {
         let { name: arg_name } = this.consume(Id);
-        let type = this.consume_type();
+        let type = this.parse_type_annotation();
         args.push(new SimpleArg(arg_name, type));
       } else if (this.scan(Spread)) {
         this.consume(Spread);
@@ -809,7 +815,8 @@ class Parser {
     let args = [];
     while (!this.scan(CloseParen)) {
       let { name } = this.consume(Id);
-      args.push(new NamedClassArg(name));
+      let type = this.parse_type_annotation();
+      args.push(new NamedClassArg(name, type));
       if (!this.scan(CloseParen)) {
         this.consume(Comma);
       };
@@ -858,7 +865,7 @@ class Parser {
     if (this.scan(OpenParen)) {
       args = this.parse_arg_defs();
     };
-    let type = this.consume_type();
+    let type = this.parse_type_annotation();
     let body = [];
     if (this.scan(Eq)) {
       this.consume(Eq);
@@ -982,25 +989,44 @@ class Parser {
     let rhs = this.parse_expr();
     return new LetObjectDeconstruction(entries, rhs);
   };
-  consume_type() {
-    if (!this.scan(Colon)) {
-      return null;
-    };
-    this.consume(Colon);
+  parse_type_expr() {
     if (this.scan(Id).name === "number") {
       this.consume(Id);
       return new NumberT();
     } else if (this.scan(Id).name === "string") {
       this.consume(Id);
       return new StrT();
+    } else if (this.scan(Id).name === "Array") {
+      this.consume(Id);
+      let [type] = this.parse_type_params();
+      return new ArrayT(type);
     } else {
       panic("type not implemented " + this.cur_token.name);
     };
   };
+  parse_type_annotation() {
+    if (!this.scan(Colon)) {
+      return null;
+    };
+    this.consume(Colon);
+    return this.parse_type_expr();
+  };
+  parse_type_params() {
+    let types = [];
+    this.consume(OpenSquare);
+    while (!this.scan(CloseSquare)) {
+      types.push(this.parse_type_expr());
+      if (this.scan(Comma)) {
+        this.consume(Comma);
+      };
+    };
+    this.consume(CloseSquare);
+    return types;
+  };
   parse_let() {
     this.consume(Let);
     let { name } = this.consume(Id);
-    let type = this.consume_type();
+    let type = this.parse_type_annotation();
     this.consume(Eq);
     let expr = this.parse_expr();
     return new NamedLet(name, expr, type);

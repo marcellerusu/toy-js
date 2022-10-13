@@ -59,13 +59,14 @@ export dataclass ArrComma
 export dataclass ArrNameEntry(name)
 export dataclass ImportStatement(imports, path)
 export dataclass DefaultImport(name, path)
-export dataclass NamedClassArg(name)
+export dataclass NamedClassArg(name, type)
 export dataclass DefaultNamedClassArg(name, expr)
 export dataclass ObjClassArg(entries)
 export dataclass ObjClassArgEntry(name)
 export dataclass DefaultObjClassArg(name, expr)
 export dataclass NumberT
 export dataclass StrT
+export dataclass ArrayT(type)
 
 class Parser(tokens)
   index = 0
@@ -551,7 +552,7 @@ class Parser(tokens)
         args.push(new SimpleDefaultArg(arg_name, expr))
       else if .scan(Id)
         let { name: arg_name } = .consume(Id)
-        let type = .consume_type()
+        let type = .parse_type_annotation()
         args.push(new SimpleArg(arg_name, type))
       else if .scan(Spread)
         .consume(Spread)
@@ -574,7 +575,8 @@ class Parser(tokens)
     let args = []
     while !.scan(CloseParen) do
       let { name } = .consume(Id)
-      args.push(new NamedClassArg(name))
+      let type = .parse_type_annotation()
+      args.push(new NamedClassArg(name, type))
       .consume(Comma) if !.scan(CloseParen)
     end
     .consume(CloseParen)
@@ -621,7 +623,7 @@ class Parser(tokens)
     let { name } = .consume(Id)
     let args = []
     args = .parse_arg_defs() if .scan(OpenParen)
-    let type = .consume_type()
+    let type = .parse_type_annotation()
     let body = []
     if .scan(Eq)
       .consume(Eq)
@@ -753,24 +755,45 @@ class Parser(tokens)
     new LetObjectDeconstruction(entries, rhs)
   end
 
-  def consume_type
-    return null if !.scan(Colon)
-    .consume(Colon)
+  def parse_type_expr
     if .scan(Id).name === "number"
       .consume(Id)
       return new NumberT()
     else if .scan(Id).name === "string"
       .consume(Id)
       return new StrT()
+    else if .scan(Id).name === "Array"
+      .consume(Id)
+      let [type] = .parse_type_params()
+      return new ArrayT(type)
     else
       assert_not_reached! "type not implemented " + this.cur_token.name
     end
   end
 
+  def parse_type_annotation
+    return null if !.scan(Colon)
+    .consume(Colon)
+
+    .parse_type_expr()
+  end
+
+  def parse_type_params
+    let types = []
+    .consume(OpenSquare)
+    while !.scan(CloseSquare) do
+      types.push(.parse_type_expr())
+      .consume(Comma) if .scan(Comma)
+    end
+    .consume(CloseSquare)
+
+    types
+  end
+
   def parse_let
     .consume(Let)
     let { name } = .consume(Id)
-    let type = .consume_type()
+    let type = .parse_type_annotation()
     .consume(Eq)
     let expr = .parse_expr()
     new NamedLet(name, expr, type)

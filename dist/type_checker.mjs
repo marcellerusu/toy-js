@@ -19,7 +19,9 @@ Array.prototype.zip = function(other) {
 Array.prototype.uniq_by = function(predicate) {
   return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
 };
-import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumberT, StrT } from "./parser.mjs";
+import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumberT, StrT, ArrayT } from "./parser.mjs";
+import Lexer from "./lexer.mjs";
+import Parser from "./parser.mjs";
 class FnT {
   constructor(args, return_type) {
     this.args = args;
@@ -33,14 +35,14 @@ class ObjT {
     this.properties = properties;
   }
 };
-class ArrayT {
-  constructor(type) {
-    this.type = type;
-  }
-};
 class UnionT {
   constructor(types) {
     this.types = types;
+  }
+};
+class DataClassT {
+  constructor(properties) {
+    this.properties = properties;
   }
 };
 let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NilT()) }), process: new ObjT({ argv: new ArrayT(new StrT()) }) };
@@ -66,9 +68,17 @@ class TypeChecker {
       this.check_function_call(node);
     } else if (node instanceof LetArrDeconstruction) {
       this.check_let_arr_deconstruction(node);
+    } else if (node instanceof DataClassDef) {
+      this.check_data_class_def(node);
     } else {
       panic("Unknown statement " + node.constructor.name);
     };
+  };
+  check_data_class_def({ name, properties }) {
+    if (!(properties.every((p) => p instanceof NamedClassArg))) panic(`assertion failed: properties.every((p) => p instanceof NamedClassArg)`);;
+    let property_types = properties.map((p) => [p.name, p.type]);
+    this.types[name] = new DataClassT(property_types);
+    return null;
   };
   check_let_arr_deconstruction({ entries, rhs }) {
     let { type } = this.infer(rhs);
@@ -97,6 +107,31 @@ class TypeChecker {
     };
     return tc.check();
   };
+  infer_id_lookup({ name }) {
+    if (this.types[name]) {
+      return this.types[name];
+    };
+    return panic("unknown type for " + name);
+  };
+  infer_dot_access({ lhs, property }) {
+    let lhs_t = this.infer(lhs);
+    if (lhs_t instanceof ArrayT) {
+      return this.infer_array_method(lhs_t, property);
+    } else if (lhs_t instanceof ObjT) {
+      return this.infer(lhs).properties[property];
+    } else if (lhs_t instanceof NumberT) {
+      return this.infer_number_method(property);
+    } else {
+      panic("unknown lhs of dot access " + lhs_t.constructor.name);
+    };
+  };
+  infer_new_expr({ expr }) {
+    if (!(expr instanceof FunctionCall)) panic(`assertion failed: expr instanceof FunctionCall`);;
+    let { lhs_expr } = expr;
+    let class_t = this.infer(lhs_expr);
+    if (!(class_t instanceof DataClassT)) panic(`assertion failed: class_t instanceof DataClassT`);;
+    return class_t;
+  };
   infer(expr) {
     if (expr instanceof NumExpr) {
       return new NumberT();
@@ -107,26 +142,15 @@ class TypeChecker {
     } else if (expr instanceof JsOpExpr) {
       return this.infer_js_op(expr.type).return_type;
     } else if (expr instanceof IdLookup) {
-      if (this.types[expr.name]) {
-        return this.types[expr.name];
-      };
-      console.log(expr);
-      panic("unknown type for " + expr.name);
+      return this.infer_id_lookup(expr);
     } else if (expr instanceof FunctionCall) {
       return this.infer(expr.lhs_expr).return_type;
     } else if (expr instanceof DotAccess) {
-      let lhs_t = this.infer(expr.lhs);
-      if (lhs_t instanceof ArrayT) {
-        return this.infer_array_method(lhs_t, expr.property);
-      } else if (lhs_t instanceof ObjT) {
-        return this.infer(expr.lhs).properties[expr.property];
-      } else if (lhs_t instanceof NumberT) {
-        return this.infer_number_method(expr.property);
-      } else {
-        panic("unknown lhs of dot access " + lhs_t.constructor.name);
-      };
+      return this.infer_dot_access(expr);
     } else if (expr instanceof ArrayLiteral) {
       return this.infer_array_literal(expr);
+    } else if (expr instanceof NewExpr) {
+      return this.infer_new_expr(expr);
     } else {
       panic("Cant infer " + expr.constructor.name);
     };
@@ -205,9 +229,24 @@ class TypeChecker {
       if (!this.types[expr.name]) {
         panic("can't find `" + expr.name + "`");
       };
+    } else if (expr instanceof NewExpr) {
+      this.check_new_expr(expr);
     } else {
-      panic("check_expr: Unknown node " + expr.constructor.name);
+      panic("check_expr: Unknown expr " + expr.constructor.name);
     };
+  };
+  check_new_expr({ expr }) {
+    if (!(expr instanceof FunctionCall)) panic(`assertion failed: expr instanceof FunctionCall`);;
+    let { lhs_expr,args } = expr;
+    let class_t = this.infer(lhs_expr);
+    if (!(class_t instanceof DataClassT)) panic(`assertion failed: class_t instanceof DataClassT`);;
+    let { properties } = class_t;
+    for (let iter of args.zip(properties)) {
+      let [arg, arg_t] = iter;
+      let [, type] = arg_t;
+      if (!(this.is_match(this.infer(arg), type))) panic(`assertion failed: this.is_match(this.infer(arg), type)`);;
+    };
+    return null;
   };
   check_array_literal({ elements }) {
     return elements.map(this.check_expr.bind(this));

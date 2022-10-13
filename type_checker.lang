@@ -14,15 +14,17 @@ import {
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
-  NumberT, StrT
+  NumberT, StrT, ArrayT
 } from "./parser"
+import Lexer from "./lexer"
+import Parser from "./parser"
 
 dataclass FnT(args, return_type)
 dataclass AnyT
 dataclass NilT
 dataclass ObjT(properties)
-dataclass ArrayT(type)
 dataclass UnionT(types)
+dataclass DataClassT(properties)
 
 let BUILTIN_TYPES = {
   console: new ObjT({ log: new FnT(new AnyT(), new NilT()) })
@@ -48,9 +50,18 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       .check_function_call(node)
     else if node is LetArrDeconstruction
       .check_let_arr_deconstruction(node)
+    else if node is DataClassDef
+      .check_data_class_def(node)
     else
       assert_not_reached! "Unknown statement " + node.constructor.name
     end
+  end
+
+  def check_data_class_def({ name, properties })
+    assert! properties.every(p => p is NamedClassArg)
+    let property_types = properties.map(p => [p.name, p.type])
+    .types[name] = new DataClassT(property_types)
+    null
   end
 
   def check_let_arr_deconstruction({ entries, rhs })
@@ -83,6 +94,32 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     tc.check()
   end
 
+  def infer_id_lookup({ name })  
+    return .types[name] if .types[name]
+    assert_not_reached! "unknown type for " ++ name
+  end
+
+  def infer_dot_access({ lhs, property })
+    let lhs_t = .infer(lhs)
+    if lhs_t is ArrayT
+      return .infer_array_method(lhs_t, property)
+    else if lhs_t is ObjT
+      return .infer(lhs).properties[property]
+    else if lhs_t is NumberT
+      return .infer_number_method(property)
+    else
+      assert_not_reached! "unknown lhs of dot access " ++ lhs_t.constructor.name
+    end
+  end
+
+  def infer_new_expr({ expr })
+    assert! expr is FunctionCall
+    let { lhs_expr } = expr
+    let class_t = .infer(lhs_expr)
+    assert! class_t is DataClassT
+    return class_t
+  end
+
   def infer(expr)
     if expr is NumExpr
       return new NumberT()
@@ -92,26 +129,16 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       return .infer(expr.expr)
     else if expr is JsOpExpr
       return .infer_js_op(expr.type).return_type
-    else if expr is IdLookup      
-      return .types[expr.name] if .types[expr.name]
-      # fail
-      console.log(expr)
-      assert_not_reached! "unknown type for " + expr.name
+    else if expr is IdLookup
+      return .infer_id_lookup(expr)
     else if expr is FunctionCall
       return .infer(expr.lhs_expr).return_type
     else if expr is DotAccess
-      let lhs_t = .infer(expr.lhs)
-      if lhs_t is ArrayT
-        return .infer_array_method(lhs_t, expr.property)
-      else if lhs_t is ObjT
-        return .infer(expr.lhs).properties[expr.property]
-      else if lhs_t is NumberT
-        return .infer_number_method(expr.property)
-      else
-        assert_not_reached! "unknown lhs of dot access " ++ lhs_t.constructor.name
-      end
+      return .infer_dot_access(expr)
     else if expr is ArrayLiteral
       return .infer_array_literal(expr)
+    else if expr is NewExpr
+      return .infer_new_expr(expr)
     else
       assert_not_reached! "Cant infer " + expr.constructor.name
     end
@@ -194,9 +221,26 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       .check_array_literal(expr)
     else if expr is IdLookup
       assert_not_reached! "can't find `" + expr.name + "`" if !.types[expr.name]
+    else if expr is NewExpr
+      .check_new_expr(expr)
     else
-      assert_not_reached! "check_expr: Unknown node " + expr.constructor.name
+      assert_not_reached! "check_expr: Unknown expr " + expr.constructor.name
     end
+  end
+
+  def check_new_expr({ expr })
+    assert! expr is FunctionCall
+    let { lhs_expr, args } = expr
+    let class_t = .infer(lhs_expr)
+    assert! class_t is DataClassT
+    let { properties } = class_t
+    for let iter of args.zip(properties) do
+      let [arg, arg_t] = iter
+      let [, type] = arg_t
+      assert! .is_match(.infer(arg), type)
+    end
+
+    null
   end
 
   def check_array_literal({ elements })

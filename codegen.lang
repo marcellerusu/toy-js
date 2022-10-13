@@ -436,6 +436,11 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     else if name === "assert_not_reached!"
       let rhs = .eval_expr(expr)
       return "panic(" + rhs + ")"
+    else if name === "panic!"
+      return "panic('break')"
+    else if name === "assert!"
+      let rhs = .eval_expr(expr)
+      return "if (!(" ++ rhs ++ ")) panic(`assertion failed: " ++ rhs ++ "`);"
     else
       assert_not_reached! "not known command: " + name
     end

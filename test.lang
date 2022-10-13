@@ -1,3 +1,6 @@
+dataclass O(a: number, b: string, c: Array[string])
+
 let [, , file_name, option] = process.argv
 
 console.log(file_name ++ "sf")
+let b = new O(10, "str", ["wtf"])

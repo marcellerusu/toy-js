@@ -400,6 +400,11 @@ class CodeGen {
     } else if (name === "assert_not_reached!") {
       let rhs = this.eval_expr(expr);
       return "panic(" + rhs + ")";
+    } else if (name === "panic!") {
+      return "panic('break')";
+    } else if (name === "assert!") {
+      let rhs = this.eval_expr(expr);
+      return "if (!(" + rhs + ")) panic(`assertion failed: " + rhs + "`);";
     } else {
       panic("not known command: " + name);
     };
