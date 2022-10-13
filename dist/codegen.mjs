@@ -31,7 +31,7 @@ class CodeGen {
   prelude = "class Panic extends Error {}\n" + "function panic(reason) {\n" + "  throw new Panic(reason);\n" + "}\n" + "Array.prototype.sum = function() {\n" + "  let sum = 0;\n" + "  for (let item of this) {\n" + "    sum += item;\n" + "  }\n" + "  return sum;\n" + "}\n" + "Array.prototype.zip = function(other) {\n" + "  let zipped = [];\n" + "  for (let i = 0; i < this.length; i++) {\n" + "    zipped.push([this[i], other[i]]);\n" + "  }\n" + "  return zipped;\n" + "}\n" + "Array.prototype.uniq_by = function(predicate) {\n" + "  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))\n" + "};\n";
   js = "";
   get padding() {
-    return Array(this.indentation + 1).join(" ");
+    return new Array(this.indentation + 1).join(" ");
   };
   eval() {
     if (this.first_run) {

@@ -43,7 +43,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
             "};\n"
 
   js = ""
-  get padding = Array(.indentation + 1).join(" ")
+  get padding = new Array(.indentation + 1).join(" ")
 
   def eval
     if .first_run
@@ -65,7 +65,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return .js
   end
 
-  def eval_statement(statement)
+  def eval_statement(statement): str
     if statement is NamedLet
       return .eval_let(statement)
     else if statement is FunctionCall
@@ -107,7 +107,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     end
   end
 
-  def eval_expr(expr)
+  def eval_expr(expr): str
     if expr is NumExpr
       return .eval_num(expr)
     else if expr is RegexNode
@@ -174,7 +174,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     return l
   end
   
-  def replace_relative(path)
+  def replace_relative(path: str): str
     if path.startsWith("./")
       return path + ".mjs"
     else
