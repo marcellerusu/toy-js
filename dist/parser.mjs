@@ -19,7 +19,7 @@ Array.prototype.zip = function(other) {
 Array.prototype.uniq_by = function(predicate) {
   return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
 };
-import { Let, Id, Eq, Num, OpenParen, CloseParen, Comma, Command, JsOp, Def, Return, End, DataClass, New, Dot, Class, Get, Str, Bang, OpenSquare, CloseSquare, If, Else, PlusEq, While, Do, Regex, Continue, Break, Export, Default, Spread, Arrow, Is, Bind, Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From } from "./lexer.mjs";
+import { Let, Id, Eq, Num, OpenParen, CloseParen, Comma, Command, JsOp, Def, Return, End, DataClass, New, Dot, Class, Get, Str, Bang, OpenSquare, CloseSquare, If, Else, PlusEq, While, Do, Regex, Continue, Break, Export, Default, Spread, Arrow, Is, Bind, Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From, Type } from "./lexer.mjs";
 export class NamedLet {
   constructor(name, expr, type) {
     this.name = name;
@@ -340,6 +340,11 @@ export class ArrayT {
     this.type = type;
   }
 };
+export class TypeDef {
+  constructor(type) {
+    this.type = type;
+  }
+};
 class Parser {
   constructor(tokens) {
     this.tokens = tokens;
@@ -466,7 +471,16 @@ class Parser {
       return this.parse_prefix_bind_lookup();
     } else if (this.scan(Dot, Id)) {
       return this.parse_prefix_dot_lookup();
+    } else if (this.scan(Type)) {
+      return this.parse_type_def();
     };
+  };
+  parse_type_def() {
+    this.consume(Type);
+    let { name } = this.consume(Id);
+    this.consume(Eq);
+    let type = this.parse_type_expr();
+    return new TypeDef(type);
   };
   ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup, PropertyLookup];
   parse_node_assignment(lhs_expr) {

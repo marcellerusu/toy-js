@@ -261,6 +261,11 @@ export class From {
     this.line = line;
   }
 };
+export class Type {
+  constructor(line) {
+    this.line = line;
+  }
+};
 class Lexer {
   constructor(str) {
     this.str = str;
@@ -355,6 +360,8 @@ class Lexer {
         tokens.push(new Is(line));
       } else if (this.scan(/not\b/)) {
         tokens.push(new Not(line));
+      } else if (this.scan(/@type\b/)) {
+        tokens.push(new Type(line));
       } else if (this.scan(/\.\.\./)) {
         tokens.push(new Spread(line));
       } else if (this.scan(/\./)) {

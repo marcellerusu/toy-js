@@ -4,7 +4,8 @@ import {
   Class, Get, Str, Bang, OpenSquare, CloseSquare,
   If, Else, PlusEq, While, Do, Regex, Continue,
   Break, Export, Default, Spread, Arrow, Is, Bind,
-  Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From
+  Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From,
+  Type
 } from "./lexer"
 
 export dataclass NamedLet(name: str, expr, type)
@@ -68,6 +69,7 @@ export dataclass NumT
 export dataclass StrT
 export dataclass BoolT
 export dataclass ArrayT(type)
+export dataclass TypeDef(type)
 
 class Parser(tokens)
   index = 0
@@ -202,7 +204,17 @@ class Parser(tokens)
       return .parse_prefix_bind_lookup()
     else if .scan(Dot, Id)
       return .parse_prefix_dot_lookup()
+    else if .scan(Type)
+      return .parse_type_def()
     end
+  end
+
+  def parse_type_def
+    .consume(Type)
+    let { name } = .consume(Id)
+    .consume(Eq)
+    let type = .parse_type_expr()
+    new TypeDef(type)
   end
 
   ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup, PropertyLookup]

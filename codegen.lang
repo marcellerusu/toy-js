@@ -13,7 +13,8 @@ import {
   RegularObjectProperty, RenamedProperty, ImportStatement,
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, DefaultNamedClassArg,  ObjClassArg,
-  SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup
+  SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
+  TypeDef
 } from "./parser"
 
 import vm from "vm"
@@ -53,6 +54,7 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
     end
 
     for let statement of .ast do
+      continue if statement is TypeDef
       .js += .padding
       let statement_js = .eval_statement(statement)
       if !statement_js

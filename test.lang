@@ -1,3 +1,5 @@
+@type A = num
+
 dataclass Obj(a: num, b: str, c: Array[str])
 
 let [, , file_name, option] = process.argv
