@@ -104,9 +104,13 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     if lhs_t is ArrayT
       return .infer_array_method(lhs_t, property)
     else if lhs_t is ObjT
-      return .infer(lhs).properties[property]
+      return lhs_t.properties[property]
     else if lhs_t is NumberT
       return .infer_number_method(property)
+    else if lhs_t is DataClassT
+      let p = lhs_t.properties.find(p => p[0] === property)
+      assert! p !== undefined
+      return p[1]
     else
       assert_not_reached! "unknown lhs of dot access " ++ lhs_t.constructor.name
     end
@@ -223,8 +227,20 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       assert_not_reached! "can't find `" + expr.name + "`" if !.types[expr.name]
     else if expr is NewExpr
       .check_new_expr(expr)
+    else if expr is DotAccess
+      .check_dot_access(expr)
     else
       assert_not_reached! "check_expr: Unknown expr " + expr.constructor.name
+    end
+  end
+
+  def check_dot_access({ lhs, property })
+    console.log(lhs, property)
+    let lhs_t = .infer(lhs)
+    if lhs_t is DataClassT
+      assert! lhs_t.properties.some(p => p[0] === property)
+    else
+      assert_not_reached! "Not able to dot access on " + lhs_t.constructor.name
     end
   end
 

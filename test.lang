@@ -4,3 +4,5 @@ let [, , file_name, option] = process.argv
 
 console.log(file_name ++ "sf")
 let b = new O(10, "str", ["wtf"])
+
+let a = b.a

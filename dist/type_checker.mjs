@@ -118,9 +118,13 @@ class TypeChecker {
     if (lhs_t instanceof ArrayT) {
       return this.infer_array_method(lhs_t, property);
     } else if (lhs_t instanceof ObjT) {
-      return this.infer(lhs).properties[property];
+      return lhs_t.properties[property];
     } else if (lhs_t instanceof NumberT) {
       return this.infer_number_method(property);
+    } else if (lhs_t instanceof DataClassT) {
+      let p = lhs_t.properties.find((p) => p[0] === property);
+      if (!(p !== undefined)) panic(`assertion failed: p !== undefined`);;
+      return p[1];
     } else {
       panic("unknown lhs of dot access " + lhs_t.constructor.name);
     };
@@ -231,8 +235,19 @@ class TypeChecker {
       };
     } else if (expr instanceof NewExpr) {
       this.check_new_expr(expr);
+    } else if (expr instanceof DotAccess) {
+      this.check_dot_access(expr);
     } else {
       panic("check_expr: Unknown expr " + expr.constructor.name);
+    };
+  };
+  check_dot_access({ lhs, property }) {
+    console.log(lhs, property);
+    let lhs_t = this.infer(lhs);
+    if (lhs_t instanceof DataClassT) {
+      if (!(lhs_t.properties.some((p) => p[0] === property))) panic(`assertion failed: lhs_t.properties.some((p) => p[0] === property)`);;
+    } else {
+      panic("Not able to dot access on " + lhs_t.constructor.name);
     };
   };
   check_new_expr({ expr }) {
