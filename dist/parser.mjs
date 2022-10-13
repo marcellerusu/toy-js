@@ -341,8 +341,14 @@ export class ArrayT {
   }
 };
 export class TypeDef {
-  constructor(type) {
+  constructor(name, type) {
+    this.name = name;
     this.type = type;
+  }
+};
+export class TypeIdLookup {
+  constructor(name) {
+    this.name = name;
   }
 };
 class Parser {
@@ -480,7 +486,7 @@ class Parser {
     let { name } = this.consume(Id);
     this.consume(Eq);
     let type = this.parse_type_expr();
-    return new TypeDef(type);
+    return new TypeDef(name, type);
   };
   ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup, PropertyLookup];
   parse_node_assignment(lhs_expr) {
@@ -1005,6 +1011,7 @@ class Parser {
     return new LetObjectDeconstruction(entries, rhs);
   };
   parse_type_expr() {
+    if (!(this.scan(Id))) panic(`assertion failed: this.scan(Id)`);;
     if (this.scan(Id).name === "num") {
       this.consume(Id);
       return new NumT();
@@ -1018,6 +1025,9 @@ class Parser {
       this.consume(Id);
       let [type] = this.parse_type_params();
       return new ArrayT(type);
+    } else if (this.scan(Id)) {
+      let { name } = this.consume(Id);
+      return new TypeIdLookup(name);
     } else {
       panic("type not implemented " + this.cur_token.name);
     };

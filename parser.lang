@@ -69,7 +69,8 @@ export dataclass NumT
 export dataclass StrT
 export dataclass BoolT
 export dataclass ArrayT(type)
-export dataclass TypeDef(type)
+export dataclass TypeDef(name: str, type)
+export dataclass TypeIdLookup(name: str)
 
 class Parser(tokens)
   index = 0
@@ -214,7 +215,7 @@ class Parser(tokens)
     let { name } = .consume(Id)
     .consume(Eq)
     let type = .parse_type_expr()
-    new TypeDef(type)
+    new TypeDef(name, type)
   end
 
   ASSIGNABLE_NODES = [DotAccess, PrefixDotLookup, IdLookup, PropertyLookup]
@@ -769,6 +770,7 @@ class Parser(tokens)
   end
 
   def parse_type_expr
+    assert! .scan(Id)
     if .scan(Id).name === "num"
       .consume(Id)
       return new NumT()
@@ -782,6 +784,9 @@ class Parser(tokens)
       .consume(Id)
       let [type] = .parse_type_params()
       return new ArrayT(type)
+    else if .scan(Id)
+      let { name } = .consume(Id)
+      return new TypeIdLookup(name)
     else
       assert_not_reached! "type not implemented " + this.cur_token.name
     end

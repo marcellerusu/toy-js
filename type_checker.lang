@@ -14,7 +14,7 @@ import {
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
-  NumT, StrT, ArrayT
+  NumT, StrT, ArrayT, TypeDef, TypeIdLookup
 } from "./parser"
 import Lexer from "./lexer"
 import Parser from "./parser"
@@ -52,9 +52,16 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       .check_let_arr_deconstruction(node)
     else if node is DataClassDef
       .check_data_class_def(node)
+    else if node is TypeDef
+      .check_type_def(node)
     else
       assert_not_reached! "Unknown statement " + node.constructor.name
     end
+  end
+
+  def check_type_def({ name, type })
+    .types[name] = type
+    null
   end
 
   def check_data_class_def({ name, properties })
@@ -177,7 +184,15 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     assert_not_reached! "type mismatch: expected `" + name + "` to be a " + expected + " but it was a " + got 
   end
 
+
+  def resolve(type)
+    return type if type is not TypeIdLookup
+    .types[type.name]
+  end
+
   def is_match(a, b)
+    a = .resolve(a)
+    b = .resolve(b)
     if a is UnionT
       return a.types.some(type => .is_match(type, b))
     else if b is UnionT
@@ -285,6 +300,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
   end
 
   def check_named_let({ name, expr, type })
+    type = .resolve(type)
     .check_expr(expr)
     let inferred_type = .infer(expr)
     if !type

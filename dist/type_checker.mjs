@@ -19,7 +19,7 @@ Array.prototype.zip = function(other) {
 Array.prototype.uniq_by = function(predicate) {
   return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
 };
-import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumT, StrT, ArrayT } from "./parser.mjs";
+import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, NumT, StrT, ArrayT, TypeDef, TypeIdLookup } from "./parser.mjs";
 import Lexer from "./lexer.mjs";
 import Parser from "./parser.mjs";
 class FnT {
@@ -70,9 +70,15 @@ class TypeChecker {
       this.check_let_arr_deconstruction(node);
     } else if (node instanceof DataClassDef) {
       this.check_data_class_def(node);
+    } else if (node instanceof TypeDef) {
+      this.check_type_def(node);
     } else {
       panic("Unknown statement " + node.constructor.name);
     };
+  };
+  check_type_def({ name, type }) {
+    this.types[name] = type;
+    return null;
   };
   check_data_class_def({ name, properties }) {
     if (!(properties.every((p) => p instanceof NamedClassArg))) panic(`assertion failed: properties.every((p) => p instanceof NamedClassArg)`);;
@@ -184,7 +190,15 @@ class TypeChecker {
   panic_mismatch(name, expected, got) {
     return panic("type mismatch: expected `" + name + "` to be a " + expected + " but it was a " + got);
   };
+  resolve(type) {
+    if (!(type instanceof TypeIdLookup)) {
+      return type;
+    };
+    return this.types[type.name];
+  };
   is_match(a, b) {
+    a = this.resolve(a);
+    b = this.resolve(b);
     if (a instanceof UnionT) {
       return a.types.some((type) => this.is_match(type, b));
     } else if (b instanceof UnionT) {
@@ -289,6 +303,7 @@ class TypeChecker {
     return null;
   };
   check_named_let({ name, expr, type }) {
+    type = this.resolve(type);
     this.check_expr(expr);
     let inferred_type = this.infer(expr);
     if (!type) {
