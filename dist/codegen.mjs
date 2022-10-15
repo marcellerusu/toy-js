@@ -8,16 +8,23 @@ Array.prototype.sum = function() {
     sum += item;
   }
   return sum;
-}
+};
 Array.prototype.zip = function(other) {
   let zipped = [];
   for (let i = 0; i < this.length; i++) {
     zipped.push([this[i], other[i]]);
   }
   return zipped;
-}
+};
 Array.prototype.uniq_by = function(predicate) {
   return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
+};
+Array.prototype.join_by = function(merge_fn) {
+  let merged = this[0];
+  for (let item of this.slice(1)) {
+    merged = merge_fn(merged, item);
+  }
+  return merged;
 };
 import { IdLookup, NamedLet, NumExpr, FunctionCall, CommandExpr, JsOpExpr, FunctionDef, ReturnExpr, DataClassDef, NewExpr, DotAccess, ClassDef, ClassInstanceEntry, ClassGetterExpr, PrefixDotLookup, StrExpr, NotExpr, ArrayLiteral, IfStatement, NodeAssignment, NodePlusAssignment, WhileStatement, RegexNode, ContinueStatement, BreakStatement, IfBranch, ElseIfBranch, ElseBranch, PropertyLookup, ExportDefault, ExportStatement, SpreadExpr, SimpleArg, SpreadArg, ArrowFn, IsOperator, BoundFunctionDef, ForLoop, IsNotOperator, ParenExpr, LetObjectDeconstruction, RegularObjectProperty, RenamedProperty, ImportStatement, DefaultImport, LetArrDeconstruction, ArrNameEntry, ArrComma, DefaultObjClassArg, NamedClassArg, DefaultNamedClassArg, ObjClassArg, SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup, TypeDef } from "./parser.mjs";
 import vm from "vm";
@@ -28,7 +35,7 @@ class CodeGen {
     this.first_run = first_run;
     this.indentation = indentation;
   }
-  prelude = "class Panic extends Error {}\n" + "function panic(reason) {\n" + "  throw new Panic(reason);\n" + "}\n" + "Array.prototype.sum = function() {\n" + "  let sum = 0;\n" + "  for (let item of this) {\n" + "    sum += item;\n" + "  }\n" + "  return sum;\n" + "}\n" + "Array.prototype.zip = function(other) {\n" + "  let zipped = [];\n" + "  for (let i = 0; i < this.length; i++) {\n" + "    zipped.push([this[i], other[i]]);\n" + "  }\n" + "  return zipped;\n" + "}\n" + "Array.prototype.uniq_by = function(predicate) {\n" + "  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))\n" + "};\n";
+  prelude = "class Panic extends Error {}\n" + "function panic(reason) {\n" + "  throw new Panic(reason);\n" + "}\n" + "Array.prototype.sum = function() {\n" + "  let sum = 0;\n" + "  for (let item of this) {\n" + "    sum += item;\n" + "  }\n" + "  return sum;\n" + "};\n" + "Array.prototype.zip = function(other) {\n" + "  let zipped = [];\n" + "  for (let i = 0; i < this.length; i++) {\n" + "    zipped.push([this[i], other[i]]);\n" + "  }\n" + "  return zipped;\n" + "};\n" + "Array.prototype.uniq_by = function(predicate) {\n" + "  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))\n" + "};\n" + "Array.prototype.join_by = function(merge_fn) {\n" + "  let merged = this[0];\n" + "  for (let item of this.slice(1)) {\n" + "    merged = merge_fn(merged, item);\n" + "  }\n" + "  return merged;\n" + "};\n";
   js = "";
   get padding() {
     return new Array(this.indentation + 1).join(" ");

@@ -31,16 +31,23 @@ class CodeGen(ast, { first_run = true, indentation = 0 })
             "    sum += item;\n" + 
             "  }\n" + 
             "  return sum;\n" + 
-            "}\n" +
+            "};\n" +
             "Array.prototype.zip = function(other) {\n" +
             "  let zipped = [];\n" +
             "  for (let i = 0; i < this.length; i++) {\n" +
             "    zipped.push([this[i], other[i]]);\n" +
             "  }\n" +
             "  return zipped;\n" +
-            "}\n" +
+            "};\n" +
             "Array.prototype.uniq_by = function(predicate) {\n" +
             "  return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))\n" +
+            "};\n" +
+            "Array.prototype.join_by = function(merge_fn) {\n" +
+            "  let merged = this[0];\n" +
+            "  for (let item of this.slice(1)) {\n" +
+            "    merged = merge_fn(merged, item);\n" +
+            "  }\n" +
+            "  return merged;\n" +
             "};\n"
 
   js = ""

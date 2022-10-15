@@ -14,10 +14,11 @@ import {
   DefaultImport, LetArrDeconstruction, ArrNameEntry,
   ArrComma, DefaultObjClassArg, NamedClassArg, ObjClassArg,
   SimpleDefaultArg, ObjLit, SimpleObjEntry, PrefixBindLookup,
-  NumT, StrT, ArrayT, TypeDef, TypeIdLookup
+  NumT, StrT, ArrayT, TypeDef, TypeIdLookup, BoolT
 } from "./parser"
 import Lexer from "./lexer"
 import Parser from "./parser"
+import fs from "fs"
 
 dataclass FnT(args, return_type)
 dataclass AnyT
@@ -25,13 +26,25 @@ dataclass NilT
 dataclass ObjT(properties)
 dataclass UnionT(types)
 dataclass DataClassT(properties)
+dataclass ClassT(methods, getters, properties)
+dataclass CombinedT(root_t, properties)
+dataclass RegexT
 
 let BUILTIN_TYPES = {
   console: new ObjT({ log: new FnT(new AnyT(), new NilT()) })
-  process: new ObjT({ argv: new ArrayT(new StrT()) })
+  process: new ObjT({ argv: new ArrayT(new StrT()) }),
+  RegExp: new RegexT()
 }
 
-class TypeChecker(ast, types = BUILTIN_TYPES)
+let Buffer = new ObjT({ toString: new FnT([], new StrT()) })
+
+let BUILTIN_PACKAGES = {
+  fs: new ObjT({
+    readFileSync: new FnT([{ type: new StrT() }], Buffer)
+  })
+}
+
+class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
   def check
     for let statement of .ast do
       .check_statement(statement)
@@ -39,9 +52,9 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     null
   end
 
-  def check_statement(node)  
+  def check_statement(node, is_exported = false)  
     if node is NamedLet
-      .check_named_let(node)
+      .check_named_let(node, is_exported)
     else if node is FunctionDef
       .check_function_def(node)
     else if node is ReturnExpr
@@ -51,11 +64,80 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     else if node is LetArrDeconstruction
       .check_let_arr_deconstruction(node)
     else if node is DataClassDef
-      .check_data_class_def(node)
+      .check_data_class_def(node, is_exported)
     else if node is TypeDef
       .check_type_def(node)
+    else if node is DefaultImport
+      .check_default_import(node)
+    else if node is ExportStatement
+      .check_export_statement(node)
+    else if node is ClassDef
+      .check_class_def(node)
     else
       assert_not_reached! "Unknown statement " + node.constructor.name
+    end
+  end
+
+  def check_class_arg(node)
+    assert! node is NamedClassArg
+    node.type || new AnyT()
+  end
+
+  def check_class_instance_entry({ name, expr })
+    [name, .infer(expr)]
+  end
+
+  def check_class_getter_expr({ name, expr })  
+    [name, .infer(expr)]
+  end
+
+  def check_class_entry(entry)
+    if entry is ClassInstanceEntry
+      return .check_class_instance_entry(entry)      
+    else if entry is ClassGetterExpr
+      return .check_class_getter_expr(entry)
+    else if entry is FunctionDef
+      return .check_function_def(entry)
+    else
+      console.log(entry)
+      assert_not_reached! "unknown class entry"
+    end
+  end
+
+  def infer_prefix_dot_lookup({ name })
+    assert! .self
+    .self[name]
+  end
+
+  def check_class_def({ name, properties, entries })
+    for let property of properties do
+      .self[property.name] = .check_class_arg(property)
+    end
+    for let entry of entries do
+      let [name, type] = .check_class_entry(entry)
+      .self[name] = type
+    end
+    
+    assert_not_reached! "class def not implemented"
+  end
+
+  def check_export_statement({ statement })
+    assert! statement is DataClassDef
+    .check_statement(statement, true)
+  end
+
+  def check_default_import({ name, path })
+    if BUILTIN_PACKAGES[path]
+      .types[name] = BUILTIN_PACKAGES[path]
+    else if path.startsWith("./")
+      let code = fs.readFileSync(path + ".lang").toString()
+      let tokens = new Lexer(code).tokenize()
+      let ast = new Parser(tokens).parse()
+      let tc = new TypeChecker(ast).check()
+      console.log(tc.types)
+      assert! false
+    else
+      assert_not_reached! "unknown package " + path
     end
   end
 
@@ -64,10 +146,11 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     null
   end
 
-  def check_data_class_def({ name, properties })
+  def check_data_class_def({ name, properties }, is_exported)
     assert! properties.every(p => p is NamedClassArg)
     let property_types = properties.map(p => [p.name, p.type])
     .types[name] = new DataClassT(property_types)
+    .types[name].exported = is_exported
     null
   end
 
@@ -87,7 +170,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
 
   def check_function_def({ name, args, body, type })
     let sub_types = Object.assign({}, .types)
-    let tc = new TypeChecker(body, sub_types)
+    let tc = new TypeChecker(body, sub_types, .self)
     # infer the returned type
     # TODO: look at all return statements, not just the last one
     type = tc.infer(body.at(-1)) if !type
@@ -95,25 +178,46 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     .types[name] = new FnT(args, type)
     # store the arg types
     for let arg of args do
-      sub_types[arg.name] = arg.type
+      sub_types[arg.name] = arg.type || new AnyT()
     end
+  console.log(sub_types)
     # type check the function body
     tc.check()
   end
 
-  def infer_id_lookup({ name })  
+  def infer_id_lookup({ name })
+    return new NilT() if name === "null"
+    return new BoolT() if name === "true" || name === "false"
     return .types[name] if .types[name]
     assert_not_reached! "unknown type for " ++ name
   end
 
+  def infer_str_method(method_name)
+    if method_name === "slice"
+      return new FnT([{ type: new NumT() }], new StrT())
+    else if method_name === "match"
+      let ret_t = new CombinedT(new ArrayT(), {
+        index: new NumT(),
+        input: new StrT(),
+        groups: new NilT()
+      })
+      return new FnT([{ type: new RegexT() }], ret_t)
+    else
+      assert_not_reached! "unknown str method " + method_name
+    end
+  end
+
   def infer_dot_access({ lhs, property })
     let lhs_t = .infer(lhs)
+    return lhs_t if lhs_t is AnyT
     if lhs_t is ArrayT
       return .infer_array_method(lhs_t, property)
     else if lhs_t is ObjT
       return lhs_t.properties[property]
     else if lhs_t is NumT
       return .infer_number_method(property)
+    else if lhs_t is StrT
+      return .infer_str_method(property)
     else if lhs_t is DataClassT
       let p = lhs_t.properties.find(p => p[0] === property)
       assert! p !== undefined
@@ -129,6 +233,17 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     let class_t = .infer(lhs_expr)
     assert! class_t is DataClassT
     return class_t
+  end
+
+  def infer_property_lookup({ lhs, property })
+    let lhs_t = .infer(lhs)
+    let property_t = .infer(property)
+    if lhs_t is StrT
+      return new StrT() if property_t is NumT
+      assert_not_reached! "unknown property `" ++ property ++ "` on str"
+    else
+      assert_not_reached! "property lookup"
+    end
   end
 
   def infer(expr)
@@ -150,7 +265,12 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       return .infer_array_literal(expr)
     else if expr is NewExpr
       return .infer_new_expr(expr)
+    else if expr is PrefixDotLookup
+      return .infer_prefix_dot_lookup(expr)
+    else if expr is PropertyLookup
+      return .infer_property_lookup(expr)
     else
+      console.log(expr)
       assert_not_reached! "Cant infer " + expr.constructor.name
     end
   end
@@ -194,6 +314,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     a = .resolve(a)
     b = .resolve(b)
     if a is UnionT
+      assert_not_reached! "fixme: union types can't be unwrapped like this"
       return a.types.some(type => .is_match(type, b))
     else if b is UnionT
       return .is_match(b, a)
@@ -250,7 +371,6 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
   end
 
   def check_dot_access({ lhs, property })
-    console.log(lhs, property)
     let lhs_t = .infer(lhs)
     if lhs_t is DataClassT
       assert! lhs_t.properties.some(p => p[0] === property)
@@ -286,12 +406,16 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     for let arg of args do
       .check_expr(arg)
     end
+    assert! .infer(lhs_expr) is FnT
     let { args: fn_arg_types } = .infer(lhs_expr)
     return null if fn_arg_types is AnyT
     assert_not_reached! "args length mismatch" if fn_arg_types.length !== args.length
 
     for let iter of args.zip(fn_arg_types) do
       let [value, {type}] = iter
+      if type is RegexT
+        console.log(value, .infer(value), .resolve(.infer(value)), type)
+      end
       if !.is_match(.infer(value), type)
         .panic_mismatch(.pretty(value), type.constructor.name, .infer(value).constructor.name)
       end
@@ -299,7 +423,10 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
     null
   end
 
-  def check_named_let({ name, expr, type })
+  def check_named_let({ name, expr, type }, is_exported)
+    if .types[name]
+      assert_not_reached! "`" ++ name ++ "` already declared"
+    end
     type = .resolve(type)
     .check_expr(expr)
     let inferred_type = .infer(expr)
@@ -312,6 +439,8 @@ class TypeChecker(ast, types = BUILTIN_TYPES)
       console.log(expr)
       .panic_mismatch(name, type.constructor.name, .infer(expr).constructor.name)
     end
+    .types[name].exported = is_exported
+    null
   end
 end
 

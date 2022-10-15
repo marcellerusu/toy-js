@@ -8,16 +8,23 @@ Array.prototype.sum = function() {
     sum += item;
   }
   return sum;
-}
+};
 Array.prototype.zip = function(other) {
   let zipped = [];
   for (let i = 0; i < this.length; i++) {
     zipped.push([this[i], other[i]]);
   }
   return zipped;
-}
+};
 Array.prototype.uniq_by = function(predicate) {
   return this.filter((x, i) => i === this.findIndex(y => predicate(x, y)))
+};
+Array.prototype.join_by = function(merge_fn) {
+  let merged = this[0];
+  for (let item of this.slice(1)) {
+    merged = merge_fn(merged, item);
+  }
+  return merged;
 };
 import { Let, Id, Eq, Num, OpenParen, CloseParen, Comma, Command, JsOp, Def, Return, End, DataClass, New, Dot, Class, Get, Str, Bang, OpenSquare, CloseSquare, If, Else, PlusEq, While, Do, Regex, Continue, Break, Export, Default, Spread, Arrow, Is, Bind, Not, For, Of, OpenBrace, CloseBrace, Colon, Import, From, Type } from "./lexer.mjs";
 export class NamedLet {
@@ -760,7 +767,8 @@ class Parser {
       return new DefaultNamedClassArg(name, expr);
     } else if (this.scan(Id)) {
       let { name } = this.consume(Id);
-      return new NamedClassArg(name);
+      let type = this.parse_type_annotation();
+      return new NamedClassArg(name, type);
     } else if (this.scan(OpenBrace)) {
       return this.parse_obj_args();
     };

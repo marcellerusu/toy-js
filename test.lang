@@ -1,6 +1,11 @@
+import fs from "fs"
+import Lexer from "./lexer"
+
 @type A = num
 
 dataclass Obj(a: A, b: str, c: Array[str])
+
+let d = fs.readFileSync("./test.lang").toString()
 
 let [, , file_name, option] = process.argv
 
