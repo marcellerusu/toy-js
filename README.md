@@ -1,7 +1,3 @@
-# Why am I doing this?
-
-https://justforfunnoreally.dev/
-
 # toy-js
 
 A compile-to-js language written in itself
@@ -59,3 +55,5 @@ let p = new Person("marcelle", 25)
 # more, see the .lang source files for more
 
 ```
+
+https://justforfunnoreally.dev/
