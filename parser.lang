@@ -25,7 +25,7 @@ export dataclass NotExpr(expr)
 export dataclass DataClassDef(name: str, properties)
 export dataclass DotAccess(lhs, property)
 export dataclass ClassDef(name: str, properties, entries)
-export dataclass ClassInstanceEntry(name: str, expr)
+export dataclass ClassInstanceEntry(name: str, expr, type)
 export dataclass ClassGetterExpr(name: str, expr)
 export dataclass PrefixDotLookup(name: str)
 export dataclass PrefixBindLookup(name: str)
@@ -461,9 +461,10 @@ class Parser(tokens)
 
   def parse_class_instance_entry
     let { name } = .consume(Id)
+    let type = .parse_type_annotation()
     .consume(Eq)
     let expr = .parse_expr()
-    new ClassInstanceEntry(name, expr)
+    new ClassInstanceEntry(name, expr, type)
   end
 
   def parse_getter
@@ -475,7 +476,7 @@ class Parser(tokens)
   end
 
   def parse_class_entry
-    if .scan(Id, Eq)
+    if .scan(Id, Eq) || .scan(Id, Colon)
       return .parse_class_instance_entry()
     else if .scan(Get)
       return .parse_getter()

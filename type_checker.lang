@@ -22,7 +22,7 @@ import fs from "fs"
 
 dataclass FnT(args, return_type)
 dataclass AnyT
-dataclass NilT
+dataclass NullT
 dataclass ObjT(properties)
 dataclass UnionT(types)
 dataclass DataClassT(properties)
@@ -31,9 +31,11 @@ dataclass CombinedT(root_t, properties)
 dataclass RegexT
 
 let BUILTIN_TYPES = {
-  console: new ObjT({ log: new FnT(new AnyT(), new NilT()) })
+  console: new ObjT({ log: new FnT(new AnyT(), new NullT()) })
   process: new ObjT({ argv: new ArrayT(new StrT()) }),
-  RegExp: new RegexT()
+  RegExp: new RegexT(),
+  true: new BoolT(),
+  false: new BoolT()
 }
 
 let Buffer = new ObjT({ toString: new FnT([], new StrT()) })
@@ -45,6 +47,8 @@ let BUILTIN_PACKAGES = {
 }
 
 class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
+  return_types = []
+
   def check
     for let statement of .ast do
       .check_statement(statement)
@@ -73,9 +77,58 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
       .check_export_statement(node)
     else if node is ClassDef
       .check_class_def(node)
+    else if node is IfStatement
+      .check_if_statement(node)
+    else if node is NodePlusAssignment
+      .check_node_plus_assignment(node)
+    else if node is NodeAssignment
+      .check_node_assignment(node)
     else
       assert_not_reached! "Unknown statement " + node.constructor.name
     end
+  end
+
+  def check_node_assignment({ lhs_expr, rhs_expr })
+    let lhs_t = .infer(lhs_expr)
+    let rhs_t = .infer(rhs_expr)
+    console.log(lhs_expr, rhs_expr, lhs_t, rhs_t)
+    assert! .is_match(lhs_t, rhs_t)
+    null
+  end
+
+  def check_node_plus_assignment({ lhs_expr, rhs_expr })
+    let lhs_t = .infer(lhs_expr)
+    let rhs_t = .infer(rhs_expr)
+    assert! lhs_t is NumT
+    assert! rhs_t is NumT
+    null
+  end
+
+  def check_if_branch({ test_expr, body })
+    .check_expr(test_expr)
+    assert! .infer(test_expr) is BoolT
+
+    let tc = new TypeChecker(body, .types, .self)
+    tc.check()
+    .return_types = .return_types.concat(tc.return_types)
+    null
+  end
+
+  def check_if_statement_branch(branch)
+    if branch is IfBranch
+      .check_if_branch(branch)
+    else if branch is ElseBranch
+      assert_not_reached! "unimplemented"
+    else if branch is ElseIfBranch
+      assert_not_reached! "unimplemented"
+    else
+      console.log(branch)
+      assert_not_reached! "unknown if branch type"
+    end
+  end
+
+  def check_if_statement({ branches })
+    branches.map(::check_if_statement_branch)
   end
 
   def check_class_arg(node)
@@ -83,8 +136,9 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     node.type || new AnyT()
   end
 
-  def check_class_instance_entry({ name, expr })
-    [name, .infer(expr)]
+  def check_class_instance_entry({ name, expr, type })
+    type = type || .infer(expr)
+    [name, type]
   end
 
   def check_class_getter_expr({ name, expr })  
@@ -97,7 +151,9 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     else if entry is ClassGetterExpr
       return .check_class_getter_expr(entry)
     else if entry is FunctionDef
-      return .check_function_def(entry)
+      let result = .check_function_def(entry)
+      assert! result.length === 1
+      return [entry.name, result[0]]
     else
       console.log(entry)
       assert_not_reached! "unknown class entry"
@@ -180,35 +236,37 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     for let arg of args do
       sub_types[arg.name] = arg.type || new AnyT()
     end
-  console.log(sub_types)
     # type check the function body
     tc.check()
+    return tc.return_types
   end
 
   def infer_id_lookup({ name })
-    return new NilT() if name === "null"
+    return new NullT() if name === "null"
     return new BoolT() if name === "true" || name === "false"
     return .types[name] if .types[name]
     assert_not_reached! "unknown type for " ++ name
   end
 
-  def infer_str_method(method_name)
+  def infer_str_property(method_name)
     if method_name === "slice"
       return new FnT([{ type: new NumT() }], new StrT())
     else if method_name === "match"
-      let ret_t = new CombinedT(new ArrayT(), {
+      let ret_t = new CombinedT(new ArrayT(new StrT()), {
         index: new NumT(),
         input: new StrT(),
-        groups: new NilT()
-      })
+        groups: new NullT()
+      }) 
       return new FnT([{ type: new RegexT() }], ret_t)
+    else if method_name === "length"
+      return new NumT()
     else
       assert_not_reached! "unknown str method " + method_name
     end
   end
 
-  def infer_dot_access({ lhs, property })
-    let lhs_t = .infer(lhs)
+  def infer_dot_access({ lhs, property }, lhs_t = null)
+    lhs_t = lhs_t || .infer(lhs)
     return lhs_t if lhs_t is AnyT
     if lhs_t is ArrayT
       return .infer_array_method(lhs_t, property)
@@ -217,12 +275,21 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     else if lhs_t is NumT
       return .infer_number_method(property)
     else if lhs_t is StrT
-      return .infer_str_method(property)
+      return .infer_str_property(property)
     else if lhs_t is DataClassT
       let p = lhs_t.properties.find(p => p[0] === property)
       assert! p !== undefined
       return p[1]
+    else if lhs_t is CombinedT
+      let { root_t, properties } = lhs_t
+      let t = properties[property]
+      if t
+        return t
+      else
+        return .infer_dot_access({ lhs: null, property: property }, root_t)
+      end
     else
+      console.log(lhs, property)
       assert_not_reached! "unknown lhs of dot access " ++ lhs_t.constructor.name
     end
   end
@@ -235,13 +302,25 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     return class_t
   end
 
-  def infer_property_lookup({ lhs, property })
-    let lhs_t = .infer(lhs)
+  def infer_property_lookup({ lhs, property }, lhs_t = null)
+    lhs_t = lhs_t || .infer(lhs)
     let property_t = .infer(property)
     if lhs_t is StrT
       return new StrT() if property_t is NumT
       assert_not_reached! "unknown property `" ++ property ++ "` on str"
+    else if lhs_t is ArrayT
+      return lhs_t.type if property_t is NumT
+      assert_not_reached! "unknown property `" ++ property ++ "` on array"
+    else if lhs_t is CombinedT
+      let { root_t, properties } = lhs_t
+      let t = properties[property]
+      if t
+        return t
+      else
+        return .infer_property_lookup({ lhs: null, property: property }, root_t)
+      end
     else
+      console.log(lhs_t)
       assert_not_reached! "property lookup"
     end
   end
@@ -252,9 +331,11 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     else if expr is StrExpr
       return new StrT()
     else if expr is ReturnExpr
-      return .infer(expr.expr)
+      let type = .infer(expr.expr)
+      .return_types.push(type)
+      return type
     else if expr is JsOpExpr
-      return .infer_js_op(expr.type).return_type
+      return .infer_js_op(expr.type, expr.lhs, expr.rhs).return_type
     else if expr is IdLookup
       return .infer_id_lookup(expr)
     else if expr is FunctionCall
@@ -269,6 +350,8 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
       return .infer_prefix_dot_lookup(expr)
     else if expr is PropertyLookup
       return .infer_property_lookup(expr)
+    else if expr is NotExpr
+      return new BoolT()
     else
       console.log(expr)
       assert_not_reached! "Cant infer " + expr.constructor.name
@@ -304,7 +387,6 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     assert_not_reached! "type mismatch: expected `" + name + "` to be a " + expected + " but it was a " + got 
   end
 
-
   def resolve(type)
     return type if type is not TypeIdLookup
     .types[type.name]
@@ -322,11 +404,19 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     a.constructor === b.constructor
   end
 
-  def infer_js_op(type)
+  def infer_js_op(type, lhs, rhs)
     if type === "+"
       return new FnT([{ type: new NumT() }, { type: new NumT() }], new NumT())
     else if type === "++"
       return new FnT([{ type: new StrT() }, { type: new StrT() }], new StrT())
+    else if type === "||"
+      let lhs_t = .infer(lhs)
+      let rhs_t = .infer(rhs)
+      return new FnT([{ type: lhs_t }, { type: rhs_t }], new UnionT([lhs_t, rhs_t]))
+    else if type === "!=="
+      let lhs_t = .infer(lhs)
+      let rhs_t = .infer(rhs)
+      return new FnT([{ type: lhs_t }, { type: rhs_t }], new BoolT())
     else
       assert_not_reached! "unknown js op type " + type
     end
@@ -339,7 +429,7 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
         console.log(lhs_t, rhs_t)
         assert_not_reached! "js operands don't match"
       end
-      let { args, return_type } = .infer_js_op(type)
+      let { args, return_type } = .infer_js_op(type, lhs, rhs)
       if !.is_match(lhs_t, args[0].type)
         console.log(type, return_type)
         console.log(lhs_t, args[0].type)
@@ -360,14 +450,24 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
     else if expr is ArrayLiteral
       .check_array_literal(expr)
     else if expr is IdLookup
-      assert_not_reached! "can't find `" + expr.name + "`" if !.types[expr.name]
+      assert_not_reached! "cant find `" + expr.name + "`" if !.types[expr.name]
     else if expr is NewExpr
       .check_new_expr(expr)
     else if expr is DotAccess
       .check_dot_access(expr)
+    else if expr is NotExpr
+      .check_not_expr(expr)
     else
       assert_not_reached! "check_expr: Unknown expr " + expr.constructor.name
     end
+  end
+
+  def check_not_expr({ expr })
+    # console.log(expr, .infer(expr))
+    # assert! .infer(expr) is BoolT
+    # null
+
+    # anything can be not'd
   end
 
   def check_dot_access({ lhs, property })
@@ -413,9 +513,6 @@ class TypeChecker(ast, types = BUILTIN_TYPES, self = {})
 
     for let iter of args.zip(fn_arg_types) do
       let [value, {type}] = iter
-      if type is RegexT
-        console.log(value, .infer(value), .resolve(.infer(value)), type)
-      end
       if !.is_match(.infer(value), type)
         .panic_mismatch(.pretty(value), type.constructor.name, .infer(value).constructor.name)
       end

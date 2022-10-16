@@ -52,7 +52,7 @@ class Lexer(str: str)
   get rest_of_string = .str.slice(.index)
   get cur = .str[.index]
 
-  matched = null
+  matched: str = null
   def scan(regex: RegExp)
     let result = .rest_of_string.match(regex)
     return false if !result || result.index !== 0

@@ -37,7 +37,7 @@ class FnT {
   }
 };
 class AnyT {};
-class NilT {};
+class NullT {};
 class ObjT {
   constructor(properties) {
     this.properties = properties;
@@ -67,7 +67,7 @@ class CombinedT {
   }
 };
 class RegexT {};
-let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NilT()) }), process: new ObjT({ argv: new ArrayT(new StrT()) }), RegExp: new RegexT() };
+let BUILTIN_TYPES = { console: new ObjT({ log: new FnT(new AnyT(), new NullT()) }), process: new ObjT({ argv: new ArrayT(new StrT()) }), RegExp: new RegexT(), true: new BoolT(), false: new BoolT() };
 let Buffer = new ObjT({ toString: new FnT([], new StrT()) });
 let BUILTIN_PACKAGES = { fs: new ObjT({ readFileSync: new FnT([{ type: new StrT() }], Buffer) }) };
 class TypeChecker {
@@ -76,6 +76,7 @@ class TypeChecker {
     this.types = types;
     this.self = self;
   }
+  return_types = [];
   check() {
     for (let statement of this.ast) {
       this.check_statement(statement);
@@ -103,16 +104,60 @@ class TypeChecker {
       this.check_export_statement(node);
     } else if (node instanceof ClassDef) {
       this.check_class_def(node);
+    } else if (node instanceof IfStatement) {
+      this.check_if_statement(node);
+    } else if (node instanceof NodePlusAssignment) {
+      this.check_node_plus_assignment(node);
+    } else if (node instanceof NodeAssignment) {
+      this.check_node_assignment(node);
     } else {
       panic("Unknown statement " + node.constructor.name);
     };
+  };
+  check_node_assignment({ lhs_expr, rhs_expr }) {
+    let lhs_t = this.infer(lhs_expr);
+    let rhs_t = this.infer(rhs_expr);
+    console.log(lhs_expr, rhs_expr, lhs_t, rhs_t);
+    if (!(this.is_match(lhs_t, rhs_t))) panic(`assertion failed: this.is_match(lhs_t, rhs_t)`);;
+    return null;
+  };
+  check_node_plus_assignment({ lhs_expr, rhs_expr }) {
+    let lhs_t = this.infer(lhs_expr);
+    let rhs_t = this.infer(rhs_expr);
+    if (!(lhs_t instanceof NumT)) panic(`assertion failed: lhs_t instanceof NumT`);;
+    if (!(rhs_t instanceof NumT)) panic(`assertion failed: rhs_t instanceof NumT`);;
+    return null;
+  };
+  check_if_branch({ test_expr, body }) {
+    this.check_expr(test_expr);
+    if (!(this.infer(test_expr) instanceof BoolT)) panic(`assertion failed: this.infer(test_expr) instanceof BoolT`);;
+    let tc = new TypeChecker(body, this.types, this.self);
+    tc.check();
+    this.return_types = this.return_types.concat(tc.return_types);
+    return null;
+  };
+  check_if_statement_branch(branch) {
+    if (branch instanceof IfBranch) {
+      this.check_if_branch(branch);
+    } else if (branch instanceof ElseBranch) {
+      panic("unimplemented");
+    } else if (branch instanceof ElseIfBranch) {
+      panic("unimplemented");
+    } else {
+      console.log(branch);
+      panic("unknown if branch type");
+    };
+  };
+  check_if_statement({ branches }) {
+    return branches.map(this.check_if_statement_branch.bind(this));
   };
   check_class_arg(node) {
     if (!(node instanceof NamedClassArg)) panic(`assertion failed: node instanceof NamedClassArg`);;
     return node.type || new AnyT();
   };
-  check_class_instance_entry({ name, expr }) {
-    return [name, this.infer(expr)];
+  check_class_instance_entry({ name, expr, type }) {
+    type = type || this.infer(expr);
+    return [name, type];
   };
   check_class_getter_expr({ name, expr }) {
     return [name, this.infer(expr)];
@@ -123,7 +168,9 @@ class TypeChecker {
     } else if (entry instanceof ClassGetterExpr) {
       return this.check_class_getter_expr(entry);
     } else if (entry instanceof FunctionDef) {
-      return this.check_function_def(entry);
+      let result = this.check_function_def(entry);
+      if (!(result.length === 1)) panic(`assertion failed: result.length === 1`);;
+      return [entry.name, result[0]];
     } else {
       console.log(entry);
       panic("unknown class entry");
@@ -197,12 +244,12 @@ class TypeChecker {
     for (let arg of args) {
       sub_types[arg.name] = arg.type || new AnyT();
     };
-    console.log(sub_types);
-    return tc.check();
+    tc.check();
+    return tc.return_types;
   };
   infer_id_lookup({ name }) {
     if (name === "null") {
-      return new NilT();
+      return new NullT();
     };
     if (name === "true" || name === "false") {
       return new BoolT();
@@ -210,20 +257,23 @@ class TypeChecker {
     if (this.types[name]) {
       return this.types[name];
     };
+    console.log(this.types);
     return panic("unknown type for " + name);
   };
-  infer_str_method(method_name) {
+  infer_str_property(method_name) {
     if (method_name === "slice") {
       return new FnT([{ type: new NumT() }], new StrT());
     } else if (method_name === "match") {
-      let ret_t = new CombinedT(new ArrayT(), { index: new NumT(), input: new StrT(), groups: new NilT() });
+      let ret_t = new CombinedT(new ArrayT(new StrT()), { index: new NumT(), input: new StrT(), groups: new NullT() });
       return new FnT([{ type: new RegexT() }], ret_t);
+    } else if (method_name === "length") {
+      return new NumT();
     } else {
       panic("unknown str method " + method_name);
     };
   };
-  infer_dot_access({ lhs, property }) {
-    let lhs_t = this.infer(lhs);
+  infer_dot_access({ lhs, property }, lhs_t = null) {
+    lhs_t = lhs_t || this.infer(lhs);
     if (lhs_t instanceof AnyT) {
       return lhs_t;
     };
@@ -234,12 +284,21 @@ class TypeChecker {
     } else if (lhs_t instanceof NumT) {
       return this.infer_number_method(property);
     } else if (lhs_t instanceof StrT) {
-      return this.infer_str_method(property);
+      return this.infer_str_property(property);
     } else if (lhs_t instanceof DataClassT) {
       let p = lhs_t.properties.find((p) => p[0] === property);
       if (!(p !== undefined)) panic(`assertion failed: p !== undefined`);;
       return p[1];
+    } else if (lhs_t instanceof CombinedT) {
+      let { root_t,properties } = lhs_t;
+      let t = properties[property];
+      if (t) {
+        return t;
+      } else {
+        return this.infer_dot_access({ lhs: null, property: property }, root_t);
+      };
     } else {
+      console.log(lhs, property);
       panic("unknown lhs of dot access " + lhs_t.constructor.name);
     };
   };
@@ -250,15 +309,29 @@ class TypeChecker {
     if (!(class_t instanceof DataClassT)) panic(`assertion failed: class_t instanceof DataClassT`);;
     return class_t;
   };
-  infer_property_lookup({ lhs, property }) {
-    let lhs_t = this.infer(lhs);
+  infer_property_lookup({ lhs, property }, lhs_t = null) {
+    lhs_t = lhs_t || this.infer(lhs);
     let property_t = this.infer(property);
     if (lhs_t instanceof StrT) {
       if (property_t instanceof NumT) {
         return new StrT();
       };
       panic("unknown property `" + property + "` on str");
+    } else if (lhs_t instanceof ArrayT) {
+      if (property_t instanceof NumT) {
+        return lhs_t.type;
+      };
+      panic("unknown property `" + property + "` on array");
+    } else if (lhs_t instanceof CombinedT) {
+      let { root_t,properties } = lhs_t;
+      let t = properties[property];
+      if (t) {
+        return t;
+      } else {
+        return this.infer_property_lookup({ lhs: null, property: property }, root_t);
+      };
     } else {
+      console.log(lhs_t);
       panic("property lookup");
     };
   };
@@ -268,9 +341,11 @@ class TypeChecker {
     } else if (expr instanceof StrExpr) {
       return new StrT();
     } else if (expr instanceof ReturnExpr) {
-      return this.infer(expr.expr);
+      let type = this.infer(expr.expr);
+      this.return_types.push(type);
+      return type;
     } else if (expr instanceof JsOpExpr) {
-      return this.infer_js_op(expr.type).return_type;
+      return this.infer_js_op(expr.type, expr.lhs, expr.rhs).return_type;
     } else if (expr instanceof IdLookup) {
       return this.infer_id_lookup(expr);
     } else if (expr instanceof FunctionCall) {
@@ -285,6 +360,8 @@ class TypeChecker {
       return this.infer_prefix_dot_lookup(expr);
     } else if (expr instanceof PropertyLookup) {
       return this.infer_property_lookup(expr);
+    } else if (expr instanceof NotExpr) {
+      return new BoolT();
     } else {
       console.log(expr);
       panic("Cant infer " + expr.constructor.name);
@@ -332,11 +409,19 @@ class TypeChecker {
     };
     return a.constructor === b.constructor;
   };
-  infer_js_op(type) {
+  infer_js_op(type, lhs, rhs) {
     if (type === "+") {
       return new FnT([{ type: new NumT() }, { type: new NumT() }], new NumT());
     } else if (type === "++") {
       return new FnT([{ type: new StrT() }, { type: new StrT() }], new StrT());
+    } else if (type === "||") {
+      let lhs_t = this.infer(lhs);
+      let rhs_t = this.infer(rhs);
+      return new FnT([{ type: lhs_t }, { type: rhs_t }], new UnionT([lhs_t, rhs_t]));
+    } else if (type === "!==") {
+      let lhs_t = this.infer(lhs);
+      let rhs_t = this.infer(rhs);
+      return new FnT([{ type: lhs_t }, { type: rhs_t }], new BoolT());
     } else {
       panic("unknown js op type " + type);
     };
@@ -348,7 +433,7 @@ class TypeChecker {
       console.log(lhs_t, rhs_t);
       panic("js operands don't match");
     };
-    let { args,return_type } = this.infer_js_op(type);
+    let { args,return_type } = this.infer_js_op(type, lhs, rhs);
     if (!this.is_match(lhs_t, args[0].type)) {
       console.log(type, return_type);
       console.log(lhs_t, args[0].type);
@@ -371,15 +456,20 @@ class TypeChecker {
       this.check_array_literal(expr);
     } else if (expr instanceof IdLookup) {
       if (!this.types[expr.name]) {
-        panic("can't find `" + expr.name + "`");
+        panic("cant find `" + expr.name + "`");
       };
     } else if (expr instanceof NewExpr) {
       this.check_new_expr(expr);
     } else if (expr instanceof DotAccess) {
       this.check_dot_access(expr);
+    } else if (expr instanceof NotExpr) {
+      this.check_not_expr(expr);
     } else {
       panic("check_expr: Unknown expr " + expr.constructor.name);
     };
+  };
+  check_not_expr({ expr }) {
+
   };
   check_dot_access({ lhs, property }) {
     let lhs_t = this.infer(lhs);
@@ -422,9 +512,6 @@ class TypeChecker {
     };
     for (let iter of args.zip(fn_arg_types)) {
       let [value, { type }] = iter;
-      if (type instanceof RegexT) {
-        console.log(value, this.infer(value), this.resolve(this.infer(value)), type);
-      };
       if (!this.is_match(this.infer(value), type)) {
         this.panic_mismatch(this.pretty(value), type.constructor.name, this.infer(value).constructor.name);
       };

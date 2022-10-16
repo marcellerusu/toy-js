@@ -118,9 +118,10 @@ export class ClassDef {
   }
 };
 export class ClassInstanceEntry {
-  constructor(name, expr) {
+  constructor(name, expr, type) {
     this.name = name;
     this.expr = expr;
+    this.type = type;
   }
 };
 export class ClassGetterExpr {
@@ -717,9 +718,10 @@ class Parser {
   };
   parse_class_instance_entry() {
     let { name } = this.consume(Id);
+    let type = this.parse_type_annotation();
     this.consume(Eq);
     let expr = this.parse_expr();
-    return new ClassInstanceEntry(name, expr);
+    return new ClassInstanceEntry(name, expr, type);
   };
   parse_getter() {
     this.consume(Get);
@@ -729,7 +731,7 @@ class Parser {
     return new ClassGetterExpr(name, expr);
   };
   parse_class_entry() {
-    if (this.scan(Id, Eq)) {
+    if (this.scan(Id, Eq) || this.scan(Id, Colon)) {
       return this.parse_class_instance_entry();
     } else if (this.scan(Get)) {
       return this.parse_getter();
